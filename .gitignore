@@ -1,1 +1,27 @@
+# Local tooling
 .claude/
+.vscode/
+.idea/
+
+# Secrets — never commit these
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+.git-credentials
+.netrc
+secrets.*
+*secret*
+*token*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+
+# Scratch output from data refreshes
+*.raw.json
