@@ -12,6 +12,7 @@
     document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
     try { localStorage.setItem(TAB_KEY, name); } catch { /* storage unavailable */ }
     if (name === 'planner') renderPlanner?.();
+    else window.ForeverTimeline?.renderAll();   // refresh "Add to planner" buttons after route edits
   }
   document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
@@ -704,6 +705,24 @@
 
   // Quests marked complete on the timeline show as done here too.
   document.addEventListener('forever:done', () => { if (!$('#planner').hidden) render(); });
+
+  // Lets the Timeline tab add a dungeon to the route, or jump to it here.
+  window.ForeverPlanner = {
+    has: key => plan.steps.some(s => s.t === 'dungeon' && s.k === key),
+    add(key) {
+      const d = byKey[key];
+      if (!d) return;
+      const step = newStep('dungeon', key, null, suggestedLevel(d));
+      change(() => plan.steps.push(step));
+      toast(`Added ${d.name} to your route at level ${step.from}`);
+    },
+    show(key) {
+      const s = plan.steps.find(x => x.t === 'dungeon' && x.k === key);
+      if (s) open.add(s.id);
+      showTab('planner');
+      if (s) document.querySelector(`.pstep[data-sid="${s.id}"]`)?.scrollIntoView({ block: 'center' });
+    },
+  };
 
   renderPlanner = render;
   let startTab = 'timeline';

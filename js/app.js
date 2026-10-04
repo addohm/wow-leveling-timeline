@@ -240,6 +240,14 @@
     });
   }
 
+  // "Add to planner" for a dungeon, or "View in planner" once it's in the route (js/planner.js).
+  // On small screens only the icon shows.
+  const planLabel = key => (window.ForeverPlanner?.has(key)
+    ? '↗<span class="pl-text"> View in planner</span>' : '＋<span class="pl-text"> Add to planner</span>');
+  const planTitle = key => (window.ForeverPlanner?.has(key) ? 'View in planner' : 'Add to planner');
+  const planBtn = (key, cls = '') => window.ForeverPlanner
+    ? `<button type="button" class="wow-btn small ${cls}" data-plan="${key}" title="${planTitle(key)}" aria-label="${planTitle(key)}">${planLabel(key)}</button>` : '';
+
   const bookBtn = key => `<button type="button" class="book" data-ref="${key}" title="Quick reference" aria-label="Quick reference: ${esc(byKey[key]?.name)}">📖</button>`;
 
   // ---------- Dungeon timeline ----------
@@ -412,6 +420,7 @@
             <span class="name">${esc(d.name)}</span>
             ${d.type === 'new' ? '<span class="new-tag">New</span>' : ''}
             <span class="spacer"></span>
+            ${planBtn(d.key, 'plan-btn')}
             ${doneCount ? `<span class="gcount done-count" title="Completed">✓ ${doneCount}</span>` : ''}
             <span class="gcount">${all.length ? (vis.length === all.length ? all.length : `${vis.length}/${all.length}`) : '—'}</span>
           </div>
@@ -551,6 +560,8 @@
   document.addEventListener('click', e => {
     const way = e.target.closest('[data-way]');
     if (way) { e.preventDefault(); e.stopPropagation(); copyWay(way); return; }
+    const plan = e.target.closest('[data-plan]');
+    if (plan) { e.preventDefault(); hideTip(); addToPlanner(plan.dataset.plan); return; }
     const ref = e.target.closest('[data-ref]');
     if (ref) { e.preventDefault(); e.stopPropagation(); hideTip(); openReference(ref.dataset.ref); return; }
     const opener = e.target.closest('[data-open]');
@@ -589,7 +600,7 @@
   });
   document.addEventListener('keydown', e => {
     const tog = e.target.closest?.('[data-toggle]');
-    if (tog && (e.key === 'Enter' || e.key === ' ') && !e.target.closest('[data-ref]')) { e.preventDefault(); toggle(tog.dataset.toggle); }
+    if (tog && (e.key === 'Enter' || e.key === ' ') && !e.target.closest('[data-ref], [data-plan]')) { e.preventDefault(); toggle(tog.dataset.toggle); }
     if (e.key === 'Escape' && !ref.open) { hideTip(); setFocus(null); }
   });
 
@@ -598,6 +609,23 @@
     renderAll();
     scrollTo(0, y);
   }
+  // Add a dungeon to the route planner, or jump to it there if it's already in the route.
+  function addToPlanner(key) {
+    const P = window.ForeverPlanner;
+    if (!P) return;
+    if (P.has(key)) {
+      if (ref.open) ref.close();
+      P.show(key);
+      return;
+    }
+    P.add(key);
+    document.querySelectorAll(`[data-plan="${key}"]`).forEach(b => {
+      b.innerHTML = planLabel(key);
+      b.title = planTitle(key);
+      b.setAttribute('aria-label', planTitle(key));
+    });
+  }
+
   function toggleDrawer(id) {
     open.has(id) ? open.delete(id) : open.add(id);
     rerenderKeepingScroll();
@@ -706,6 +734,8 @@
             <h2>${esc(d.name)} ${d.type === 'new' ? '<span class="new-tag">New</span>' : ''}</h2>
             <p class="dim">Levels ${d.min}–${d.max} · ${esc(jd?.location || d.zone)}</p>
           </div>
+          <span class="spacer"></span>
+          ${planBtn(key)}
           <button type="button" class="close-x" onclick="this.closest('dialog').close()" aria-label="Close">✕</button>
         </header>
         <div class="ref-body">
@@ -808,6 +838,6 @@
   // Shared with the route planner (js/planner.js).
   window.ForeverTimeline = {
     DUNGEONS, QUESTS, questById, byKey, done, ZONES,
-    diffAt, questLocation, locHTML, chainFor, chainProgress, esc, toast, hideTip,
+    diffAt, questLocation, locHTML, chainFor, chainProgress, esc, toast, hideTip, renderAll,
   };
 })();

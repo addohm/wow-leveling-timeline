@@ -519,6 +519,11 @@ select:focus, input:focus-visible, button:focus-visible {
 }
 .group-head.collapsed .caret { transform: rotate(-90deg); }
 .group-head .gcount { font: 500 12px/1 "Alegreya Sans", sans-serif; color: var(--ink-dim); }
+/* "Add to planner" shows on the dungeon you clicked */
+.group-head .plan-btn { display: none; padding: 4px 8px; font-size: 11.5px; letter-spacing: 0; text-transform: none; }
+.qgroup.focus .group-head .plan-btn { display: inline-block; }
+.ref-head .spacer { flex: 1; }
+.ref-head .wow-btn { align-self: center; }
 .wing-head .label { padding-left: 26px; font-style: italic; color: var(--ink-dim); font-size: 13px; }
 .row.q .label { padding-left: 26px; }
 .row.empty .label { padding-left: 26px; color: var(--ink-dim); font-style: italic; font-size: 13px; }
@@ -1071,6 +1076,7 @@ footer.frame { margin-top: 26px; margin-bottom: 36px; }
   .note-form { grid-template-columns: 70px minmax(0, 1fr); }
   .add-row select { flex: 1 1 100%; min-width: 0; }
   .add-label { width: auto; flex-basis: 100%; }
+  .group-head .plan-btn .pl-text { display: none; }
   .add-row .form-err { margin-left: 0; }
   .tabs button { padding: 9px 14px; font-size: 13px; }
 }
