@@ -429,8 +429,6 @@
 
   function renderSummary() {
     const g = gaps();
-    const missing = DUNGEONS.filter(d => !plan.steps.some(s => s.t === 'dungeon' && s.k === d.key)).length;
-    $('#p-add-all').textContent = missing ? `Add all dungeons (${missing})` : 'All dungeons added';
     $('#p-summary').innerHTML = g.length
       ? `<p class="pwarn warn">⚠ Nothing planned for ${g.map(([a, b]) => b - a === 1 ? `level ${a}` : `levels ${a}–${b - 1}`).join(', ')}. Shaded on the timeline.</p>`
       : '';
@@ -481,7 +479,7 @@
     const rows = plan.steps.map((s, i) => stepRow(s, i, (notesFor[s.id] || []).sort((a, b) => a.lv - b.lv)));
     const y = scrollY;
     $('#route-timeline').innerHTML = gridHTML() + axisHTML() + (rows.length ? rows.join('')
-      : '<div class="no-results">No steps yet. Add a zone or dungeon below, add every dungeon at once, or load the example route.</div>');
+      : '<div class="no-results">No steps yet. Add a zone, dungeon or custom step below, or load the example route.</div>');
     scrollTo(0, y);
     renderSummary();
     renderNotes();
@@ -525,14 +523,6 @@
     $('#p-add-name').value = '';
     document.querySelector(`.pstep[data-sid="${step.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   });
-
-  function addAllDungeons() {
-    const missing = DUNGEONS.filter(d => !plan.steps.some(s => s.t === 'dungeon' && s.k === d.key));
-    if (!missing.length) { toast('Every dungeon is already in your route'); return; }
-    if (!confirm(`Add ${missing.length} dungeons to your route?\n\nEach one goes in as a single point at its suggested level. Drag a point’s handles to stretch it over the levels you’ll spend there.`)) return;
-    change(() => missing.forEach(d => plan.steps.push(newStep('dungeon', d.key, null, suggestedLevel(d)))));
-    toast(`Added ${missing.length} dungeons`);
-  }
 
   document.addEventListener('click', e => {
     // Quest links in the planner open the quest on the timeline: switch tabs before app.js scrolls to it.
@@ -659,7 +649,6 @@
   $('#route-timeline').addEventListener('pointercancel', endDrag);
 
   // ---------- Route controls ----------
-  $('#p-add-all').addEventListener('click', addAllDungeons);
 
   $('#p-faction').addEventListener('click', e => {
     const b = e.target.closest('button');

@@ -1006,7 +1006,6 @@ ul.ref-quests li.skipped a { opacity: .45; text-decoration: line-through; }
 .add-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
 .add-row select { flex: 0 1 360px; min-width: 220px; }
 .add-row input[type=text] { flex: 0 1 220px; }
-.add-row .spacer { flex: 1; }
 .lv-field { display: flex; align-items: center; gap: 6px; font: 700 12px/1 "Cinzel", serif; letter-spacing: .08em; color: var(--gold); }
 .lv-field input.num { width: 64px; }
 #p-add-err { margin: 6px 0 0; }
