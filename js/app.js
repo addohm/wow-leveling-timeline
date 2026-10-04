@@ -59,7 +59,7 @@
 
   // ---------- State ----------
   // Every setting is remembered in this browser between visits.
-  const defaults = { level: 15, faction: 'all', type: 'all', cls: '', share: false, near: true, hideDone: false, search: '', collapsed: [], done: [] };
+  const defaults = { level: 15, faction: 'all', type: 'all', cls: '', share: false, near: true, fadeFar: false, hideDone: false, search: '', collapsed: [], done: [] };
   const state = { ...defaults, ...load() };
   state.q = state.search.trim().toLowerCase();   // normalised search, derived from `search`
   const collapsed = new Set(state.collapsed);
@@ -262,8 +262,9 @@
       const min = w ? w.min : d.min;
       const max = w ? w.max : d.max;
       const inRange = state.level >= min && state.level <= max;
+      const far = state.fadeFar && !rangeNear(min, max);
       rows.push(`
-        <div class="row d${inRange ? ' in-range' : ''}${focus === d.key ? ' selected' : ''}" data-d="${d.key}">
+        <div class="row d${inRange ? ' in-range' : ''}${far ? ' far' : ''}${focus === d.key ? ' selected' : ''}" data-d="${d.key}">
           <div class="label">
             ${bookBtn(d.key)}
             <a class="name" href="#g-${d.key}" data-jump="${d.key}">${esc(d.name)}${w ? ` <span class="wing-name">· ${esc(w.name)}</span>` : ''}</a>
@@ -309,7 +310,7 @@
     const isDone = done.has(q.id);
     const isOpen = open.has(q.id);
     return `
-      <div class="row q${doable ? '' : ' dim'}${isDone ? ' done' : ''}${isOpen ? ' open' : ''}" data-q="${q.id}">
+      <div class="row q${doable ? '' : ' dim'}${state.fadeFar && !questNear(q) ? ' far' : ''}${isDone ? ' done' : ''}${isOpen ? ' open' : ''}" data-q="${q.id}">
         <div class="label">
           <span class="fac ${fc}" title="${ft}">${fl}</span>
           <a class="name d-${diff}" href="#q-${q.id}" data-open="${q.id}" data-tip="q:${q.idx}" aria-expanded="${isOpen}">${isDone ? '<span class="done-mark" aria-label="Completed">✓</span>' : ''}${esc(q.name)}</a>
@@ -412,8 +413,9 @@
       const g = [];
       out.push(`<div class="qgroup${focus === d.key ? ' focus' : ''}" data-d="${d.key}">`, g, '</div>');
       const doneCount = all.filter(q => done.has(q.id)).length;
+      const groupFar = state.fadeFar && !dungeonRanges(d).some(w => rangeNear(w.min, w.max)) && !vis.some(questNear);
       g.push(`
-        <div class="row group-head${isCollapsed ? ' collapsed' : ''}" id="g-${d.key}">
+        <div class="row group-head${isCollapsed ? ' collapsed' : ''}${groupFar ? ' far' : ''}" id="g-${d.key}">
           <div class="label" role="button" tabindex="0" aria-expanded="${!isCollapsed}" data-toggle="${d.key}">
             <span class="caret">▼</span>
             ${bookBtn(d.key)}
@@ -793,6 +795,7 @@
     $('#share').checked = state.share;
     $('#near').checked = state.near;
     $('#hide-done').checked = state.hideDone;
+    $('#fade-far').checked = state.fadeFar;
     $('#cls').value = state.cls;
     $('#search').value = state.search;
   }
@@ -817,8 +820,18 @@
     syncControls(); renderAll(); save();
   }));
   $('#share').addEventListener('change', e => { state.share = e.target.checked; renderAll(); save(); });
-  $('#near').addEventListener('change', e => { state.near = e.target.checked; renderAll(); save(); });
+  $('#near').addEventListener('change', e => {
+    state.near = e.target.checked;
+    if (state.near) state.fadeFar = false;
+    syncControls(); renderAll(); save();
+  });
   $('#hide-done').addEventListener('change', e => { state.hideDone = e.target.checked; renderAll(); save(); });
+  // Hiding and fading out-of-range items are alternatives: ticking one unticks the other.
+  $('#fade-far').addEventListener('change', e => {
+    state.fadeFar = e.target.checked;
+    if (state.fadeFar) state.near = false;
+    syncControls(); renderAll(); save();
+  });
   $('#cls').addEventListener('change', e => { state.cls = e.target.value; renderAll(); save(); });
   $('#search').addEventListener('input', e => {
     state.search = e.target.value;

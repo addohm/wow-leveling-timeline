@@ -488,6 +488,15 @@ select:focus, input:focus-visible, button:focus-visible {
 
 .row.d .label .name { cursor: pointer; }
 .row.d.selected .label { box-shadow: inset 3px 0 0 var(--gold); background: #2c2214; }
+
+/* "Show in-range": anything outside your level (+1) is faded, not hidden.
+   Only the row's contents fade, so the sticky name column stays opaque. */
+.row .label > *, .row .track .bar { transition: opacity .15s; }
+.row.far .label > *, .row.far .track .bar { opacity: .28; }
+.row.far:hover .label > *, .row.far:hover .track .bar,
+.row.far:focus-within .label > *, .row.far:focus-within .track .bar,
+.row.far.selected .label > *, .row.far.selected .track .bar,
+.row.far.open .label > *, .row.far.open .track .bar { opacity: .8; }
 .row.d.selected .label .name { color: var(--gold); }
 .row.d.selected .bar.dungeon { outline: 2px solid var(--gold); outline-offset: 1px; }
 
