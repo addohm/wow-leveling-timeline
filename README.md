@@ -15,7 +15,7 @@ is red at 10, orange at 11, and grey at 22, so its bar runs from 11 to 22.
 
 Set your level to color quest names the way the in-game quest log does. By default only
 dungeons and quests you can do at your level (or will be able to at the next level) are shown;
-untick **Only show my level (+1)** to see everything. **Show in-range** is the alternative: it
+untick **Only show my level (+1)** to see everything. **Highlight in-range** is the alternative: it
 keeps everything listed but fades what's outside that range, on both the dungeon and quest
 timelines. Ticking one unticks the other. You can also filter by faction,
 shareable quests, class quests, or new vs. classic dungeons. Every setting is remembered in

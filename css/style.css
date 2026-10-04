@@ -489,7 +489,7 @@ select:focus, input:focus-visible, button:focus-visible {
 .row.d .label .name { cursor: pointer; }
 .row.d.selected .label { box-shadow: inset 3px 0 0 var(--gold); background: #2c2214; }
 
-/* "Show in-range": anything outside your level (+1) is faded, not hidden.
+/* "Highlight in-range": anything outside your level (+1) is faded, not hidden.
    Only the row's contents fade, so the sticky name column stays opaque. */
 .row .label > *, .row .track .bar { transition: opacity .15s; }
 .row.far .label > *, .row.far .track .bar { opacity: .28; }
