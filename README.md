@@ -52,7 +52,9 @@ step itself to move it. A step whose min and max are the same is a single point.
 - **Warnings**: flags under-leveled dungeons, quests still red or already grey when you get
   there, zones you'll outlevel, and levels nothing in the route covers (shaded).
 - **Your level**: the same level as the Timeline tab, marked on the planner's axis. *Only show my
-  level (+1)* hides steps and notes outside it, and *Highlight in-range* fades them instead.
+  level (+2)* hides route steps outside your level to two levels above, and *Highlight in-range*
+  fades them instead. Either way at least 5 steps stay shown, topped up with the nearest ones.
+  The level notes list can be collapsed.
 - **Level notes**: reminders pinned to a level, like "at 14, the sleeping bag chain begins".
   They stay at that level when steps move. Each note can also have a **quest**, **items**
   (comma-separated) and a YouTube **video**; each takes an ID or a full link, and a video can
@@ -96,7 +98,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=22`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=23`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally

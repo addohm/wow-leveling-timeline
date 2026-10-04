@@ -403,18 +403,26 @@
   const pct = L => ((Math.max(AMIN, Math.min(AMAX, L)) - AMIN) / (AMAX - AMIN)) * 100;
 
   // ---------- Level filter ----------
-  // "Your level" is shared with the Timeline tab. Like there, the planner can hide or fade steps and
-  // notes outside your level (+1); those two settings are the planner's own, remembered per browser.
+  // "Your level" is shared with the Timeline tab. The planner can hide or fade route steps outside
+  // your level (+2), always keeping at least MIN_SHOWN of them: when fewer are in range, the steps
+  // nearest that range fill in. These settings, and whether the notes are collapsed, are the
+  // planner's own and remembered per browser.
   const VIEW_KEY = 'forever-planner-view';
-  const view = { near: false, fadeFar: false };
+  const view = { near: false, fadeFar: false, notesCollapsed: false };
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY)) || {};
     for (const k of Object.keys(view)) if (typeof v[k] === 'boolean') view[k] = v[k];
   } catch { /* storage unavailable */ }
   const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch { /* storage unavailable */ } };
   const myLevel = () => T.getLevel?.() ?? 15;
-  const stepNear = (s, L) => s.from <= L + 1 && s.end >= L;
-  const noteNear = (n, L) => n.lv >= L && n.lv <= L + 1;
+  const AHEAD = 2, MIN_SHOWN = 5;
+  // How many levels a step is from the window [L, L + AHEAD]; 0 when it overlaps.
+  const stepDistance = (s, L) => (s.end < L ? L - s.end : s.from > L + AHEAD ? s.from - (L + AHEAD) : 0);
+  function inRangeSteps(L) {
+    const ranked = plan.steps.map((s, i) => [s, stepDistance(s, L), i]).sort((a, b) => a[1] - b[1] || a[2] - b[2]);
+    const near = ranked.filter(r => r[1] === 0);
+    return new Set((near.length >= MIN_SHOWN ? near : ranked.slice(0, MIN_SHOWN)).map(r => r[0].id));
+  }
 
   function gridHTML(L) {
     let h = '<div class="grid" aria-hidden="true">';
@@ -682,12 +690,12 @@
   let editingNote = null;          // id of the note being edited in place
 
   function renderNotes() {
-    const L = myLevel();
-    const all = [...plan.notes].sort((a, b) => a.lv - b.lv);
-    const list = view.near ? all.filter(n => n.id === editingNote || noteNear(n, L)) : all;
-    const empty = all.length
-      ? `<li class="dim">No notes at level ${L} or ${L + 1}. Untick “Only show my level (+1)” to see all ${all.length}.</li>`
-      : '<li class="dim">No notes yet. Pin a reminder to a level, like a quest chain to start or a class trainer visit.</li>';
+    const list = [...plan.notes].sort((a, b) => a.lv - b.lv);
+    const empty = '<li class="dim">No notes yet. Pin a reminder to a level, like a quest chain to start or a class trainer visit.</li>';
+    $('#p-notes-count').textContent = list.length || '';
+    $('#p-notes-body').hidden = view.notesCollapsed;
+    $('#p-notes-toggle').setAttribute('aria-expanded', String(!view.notesCollapsed));
+    $('#p-notes-toggle').closest('.notes-panel').classList.toggle('collapsed', view.notesCollapsed);
     $('#p-notes').innerHTML = list.length ? list.map(n => {
       if (n.id === editingNote) {
         return `
@@ -704,7 +712,7 @@
       }
       const owners = noteOwners(n);
       return `
-        <li${view.fadeFar && !noteNear(n, L) ? ' class="far"' : ''}>
+        <li>
           <span class="note-lv">${n.lv}</span>
           <div class="note-body">
             <div>${esc(n.text)}${noteLinkHTML(n)}</div>
@@ -831,19 +839,21 @@
     const L = myLevel();
     const notesFor = {};
     for (const n of plan.notes) for (const s of noteOwners(n)) (notesFor[s.id] ||= []).push(n);
-    // Step numbers stay the same whether or not other steps are hidden.
+    // Step numbers stay the same whether or not other steps are hidden; an open step stays shown.
+    const inRange = inRangeSteps(L);
     const rows = plan.steps.map((s, i) => {
-      const near = stepNear(s, L);
+      const near = inRange.has(s.id);
       if (view.near && !near && !open.has(s.id)) return '';
       return stepRow(s, i, (notesFor[s.id] || []).sort((a, b) => a.lv - b.lv), view.fadeFar && !near);
     }).filter(Boolean);
-    const empty = plan.steps.length
-      ? `<div class="no-results">Nothing in your route at level ${L} or ${L + 1}. Untick “Only show my level (+1)” to see all ${plan.steps.length} steps.</div>`
-      : '<div class="no-results">No steps yet. Add a zone, dungeon or custom step below, or load the example route.</div>';
+    const empty = '<div class="no-results">No steps yet. Add a zone, dungeon or custom step below, or load the example route.</div>';
     const y = scrollY;
     $('#route-timeline').innerHTML = gridHTML(L) + axisHTML() + (rows.length ? rows.join('') : empty);
     scrollTo(0, y);
     renderSummary();
+    if (view.near && rows.length < plan.steps.length) {
+      $('#p-summary').insertAdjacentHTML('afterbegin', `<p class="dim small">Showing ${rows.length} of ${plan.steps.length} steps near level ${L}–${L + AHEAD}. Untick “Only show my level (+2)” to see them all.</p>`);
+    }
     renderNotes();
     renderAddSelects();
     syncSettings();
@@ -1037,6 +1047,10 @@
     view.near = e.target.checked;
     if (view.near) view.fadeFar = false;
     saveView(); render();
+  });
+  $('#p-notes-toggle').addEventListener('click', () => {
+    view.notesCollapsed = !view.notesCollapsed;
+    saveView(); renderNotes();
   });
   $('#p-fade-far').addEventListener('change', e => {
     view.fadeFar = e.target.checked;

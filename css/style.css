@@ -497,11 +497,9 @@ select:focus, input:focus-visible, button:focus-visible {
 .row.far:focus-within .label > *, .row.far:focus-within .track .bar,
 .row.far.selected .label > *, .row.far.selected .track .bar,
 .row.far.open .label > *, .row.far.open .track .bar { opacity: .8; }
-/* Route planner: same fading for steps and notes */
+/* Route planner: same fading for steps */
 .row.pstep.far .pbar, .row.pstep.far .ph { opacity: .28; }
 .row.pstep.far:hover .pbar, .row.pstep.far.open .pbar, .row.pstep.far.dragging .pbar { opacity: .8; }
-.note-list li.far > * { opacity: .35; }
-.note-list li.far:hover > *, .note-list li.far:focus-within > * { opacity: .85; }
 .row.d.selected .label .name { color: var(--gold); }
 .row.d.selected .bar.dungeon { outline: 2px solid var(--gold); outline-offset: 1px; }
 
@@ -1051,6 +1049,22 @@ ul.ref-quests li.skipped a { opacity: .45; text-decoration: line-through; }
 
 .notes-panel { margin-top: 18px; padding-top: 12px; border-top: 1px solid #3b2f1e; }
 .notes-panel h3 { margin: 0 0 8px; font: 700 18px/1.1 "Cinzel", serif; color: var(--gold); }
+.notes-panel.collapsed h3 { margin-bottom: 0; }
+.notes-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.notes-toggle:hover { color: #fff3a8; }
+.notes-toggle .caret { width: 12px; font-size: 11px; color: var(--gold-dim); transition: transform .15s; }
+.notes-panel.collapsed .notes-toggle .caret { transform: rotate(-90deg); }
+.notes-toggle .gcount { font: 500 13px/1 "Alegreya Sans", sans-serif; color: var(--ink-dim); }
 .note-list { list-style: none; margin: 0 0 10px; padding: 0; }
 .note-list li { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255, 209, 0, .07); }
 .note-lv {
