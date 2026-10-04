@@ -5,27 +5,67 @@
   const LMAX = 60;
   const CELLS = LMAX - LMIN + 1;           // level L occupies the cell [L, L+1)
   const STORE_KEY = 'forever-timeline-v1';
-  const WOWHEAD = 'https://www.wowhead.com/forever/quest=';
+  const WOWHEAD = 'https://www.wowhead.com/forever/';
 
   const DUNGEONS = window.FOREVER_DUNGEONS || [];
   const RAW = window.FOREVER_QUESTS || { quests: [] };
+  const J = window.FOREVER_JOURNAL || { quests: {}, chains: {}, dungeons: {} };
   const byKey = Object.fromEntries(DUNGEONS.map(d => [d.key, d]));
 
+  // Classic uiMapIDs used by the DungeonJournal addon.
+  const ZONES = {
+    1411: 'Durotar', 1412: 'Mulgore', 1413: 'The Barrens', 1414: 'Kalimdor', 1415: 'Eastern Kingdoms',
+    1416: 'Alterac Mountains', 1417: 'Arathi Highlands', 1418: 'Badlands', 1419: 'Blasted Lands',
+    1420: 'Tirisfal Glades', 1421: 'Silverpine Forest', 1422: 'Western Plaguelands', 1423: 'Eastern Plaguelands',
+    1424: 'Hillsbrad Foothills', 1425: 'The Hinterlands', 1426: 'Dun Morogh', 1427: 'Searing Gorge',
+    1428: 'Burning Steppes', 1429: 'Elwynn Forest', 1430: 'Deadwind Pass', 1431: 'Duskwood', 1432: 'Loch Modan',
+    1433: 'Redridge Mountains', 1434: 'Stranglethorn Vale', 1435: 'Swamp of Sorrows', 1436: 'Westfall',
+    1437: 'Wetlands', 1438: 'Teldrassil', 1439: 'Darkshore', 1440: 'Ashenvale', 1441: 'Thousand Needles',
+    1442: 'Stonetalon Mountains', 1443: 'Desolace', 1444: 'Feralas', 1445: 'Dustwallow Marsh', 1446: 'Tanaris',
+    1447: 'Azshara', 1448: 'Felwood', 1449: "Un'Goro Crater", 1450: 'Moonglade', 1451: 'Silithus',
+    1452: 'Winterspring', 1453: 'Stormwind City', 1454: 'Orgrimmar', 1455: 'Ironforge', 1456: 'Thunder Bluff',
+    1457: 'Darnassus', 1458: 'Undercity',
+  };
+  const QUALITY = ['q-poor', 'q-common', 'q-uncommon', 'q-rare', 'q-epic', 'q-legendary'];
+
+  // Classic quest colours from quest level + required level, for quests Wowhead hasn't covered.
+  // Grey once the player outlevels the quest by 5 + floor(playerLevel / 10).
+  function estimateColours(level, req) {
+    let grey = level + 1;
+    while (grey - (5 + Math.floor(grey / 10)) < level) grey++;
+    const orange = Math.max(req, level - 4);
+    return { red: req, orange, yellow: Math.max(req, level - 2), green: level + 3, grey };
+  }
+
+  // Wowhead guide quests, plus dungeon quests only the addon knows about.
+  const known = new Set(RAW.quests.map(q => q.id));
+  const SIDE_OF = { Alliance: 'A', Horde: 'H', Both: 'B' };
+  const extra = Object.values(J.quests)
+    .filter(a => a.dungeon && a.name && a.level && !known.has(a.id) && byKey[a.dungeon])
+    .map(a => ({
+      id: a.id, name: a.name, d: a.dungeon, side: SIDE_OF[a.faction] || 'B', share: null,
+      req: a.requires ?? a.level, level: a.level, ...estimateColours(a.level, a.requires ?? a.level),
+      starts: a.pickup, estimated: true, classes: a.classOnly ? [a.classOnly] : undefined,
+    }));
+
   // Normalise quests: `from` = first level the quest is not red, `to` = level it turns grey.
-  const QUESTS = RAW.quests.map((q, i) => ({
+  const QUESTS = [...RAW.quests, ...extra].map((q, i) => ({
     ...q,
     idx: i,
     from: q.orange ?? q.yellow ?? q.green ?? q.req,
     to: q.grey ?? (q.level + 6),
   }));
+  const questById = new Map(QUESTS.map(q => [q.id, q]));
 
   // ---------- State ----------
   // Every setting is remembered in this browser between visits.
-  const defaults = { level: 15, faction: 'all', type: 'all', cls: '', share: false, near: true, search: '', collapsed: [] };
+  const defaults = { level: 15, faction: 'all', type: 'all', cls: '', share: false, near: true, hideDone: false, search: '', collapsed: [], done: [] };
   const state = { ...defaults, ...load() };
   state.q = state.search.trim().toLowerCase();   // normalised search, derived from `search`
   const collapsed = new Set(state.collapsed);
-  let focus = null;   // dungeon key highlighted in the quest timeline
+  const done = new Set(state.done);               // completed quest (and chain step) IDs
+  const open = new Set();                         // quests whose detail drawer is open
+  let focus = null;                               // dungeon key highlighted in the quest timeline
 
   function load() {
     try {
@@ -35,8 +75,8 @@
   }
   function save() {
     try {
-      const { q, collapsed: _, ...rest } = state;
-      localStorage.setItem(STORE_KEY, JSON.stringify({ ...rest, collapsed: [...collapsed] }));
+      const { q, collapsed: _c, done: _d, ...rest } = state;
+      localStorage.setItem(STORE_KEY, JSON.stringify({ ...rest, collapsed: [...collapsed], done: [...done] }));
     } catch { /* storage unavailable */ }
   }
 
@@ -45,6 +85,7 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const pct = L => ((clamp(L, LMIN, LMAX + 1) - LMIN) / CELLS) * 100;
+  const fmt = n => (Math.round(n * 10) / 10).toFixed(1);
 
   function barStyle(from, toExcl) {
     const left = pct(from);
@@ -63,6 +104,81 @@
   const SIDE = { A: ['fac-a', 'A', 'Alliance'], H: ['fac-h', 'H', 'Horde'], B: ['fac-b', 'N', 'Alliance & Horde'] };
   const FLAG = { pre: ['Pre', 'Has prerequisite quests'], drop: ['Drop', 'Starts from a dropped item'], escort: ['Esc', 'Escort quest'], object: ['Obj', 'Starts from an object'], tbd: ['TBD', 'Details still being confirmed'], repeatable: ['Rep', 'Repeatable'] };
 
+  // ---------- Locations ----------
+  // Map point from the addon ({mapID, x, y} in 0-100) or Wowhead ({zone, x, y}).
+  function pointFrom(p) {
+    if (!p) return null;
+    const zone = p.zone || ZONES[p.mapID];
+    return zone && p.x != null ? { zone, x: p.x, y: p.y, label: p.label } : null;
+  }
+
+  // Where to pick a quest up: town/subzone text plus coordinates.
+  // Text comes from the Wowhead guide ("Orgrimmar, The Drag - Neeru Fireblade /way 49 50")
+  // or the addon's pickup note; coordinates prefer the addon, then Wowhead's map data,
+  // then the guide's /way.
+  function questLocation(id) {
+    const q = questById.get(id);
+    const a = J.quests[id];
+    let place = null, npc = q?.start || null;
+    const guide = q?.starts || '';
+    const m = guide.match(/^(.+?)\s*-\s+(.+?)(?:\s*\/(?:way)?\s*[\d.]+[ ,]+[\d.]+.*)?$/);
+    if (m && !/^(inside|the hall of thanes|.*(deeps|downs|kraul|keep|chasm|caverns),)/i.test(m[1])) {
+      place = m[1].replace(/\s*,\s*/g, ', ').trim();
+      npc = npc || m[2].replace(/\s*\/.*$/, '').trim();
+    }
+    let pt = pointFrom(a?.startMap) || pointFrom(q?.startAt);
+    if (!pt) {
+      const w = guide.match(/\/(?:way\s*)?([\d.]+)[ ,]+([\d.]+)/);
+      const zone = place ? place.split(',')[0] : null;
+      if (w && zone) pt = { zone, x: +w[1], y: +w[2] };
+    }
+    if (!place && a?.pickup && !/inside|dungeon|drop|item/i.test(a.pickup)) {
+      const parts = a.pickup.split(',').map(s => s.trim());
+      if (parts.length > 1) { npc = npc || parts[0]; place = parts.slice(1).join(', '); }
+    }
+    if (!place && pt) place = pt.zone;
+    if (!place && !pt) {
+      const text = guide + ' ' + (a?.pickup || '');
+      if (/inside|dungeon|interact|vault/i.test(text)) return { place: 'Inside the dungeon', inside: true, npc };
+      if (/drop|item/i.test(text)) return { place: 'Starts from an item', inside: true, npc };
+      return null;
+    }
+    return { place, pt, npc };
+  }
+
+  const wayCmd = pt => `/way ${pt.zone} ${fmt(pt.x)} ${fmt(pt.y)}`;
+  function locHTML(loc, cls = '') {
+    if (!loc) return '';
+    const coords = loc.pt ? ` <span class="coords">${fmt(loc.pt.x)}, ${fmt(loc.pt.y)}</span>` : '';
+    const title = loc.pt ? `Copy ${wayCmd(loc.pt)}` : '';
+    return loc.pt
+      ? `<button type="button" class="loc ${cls}" data-way="${esc(wayCmd(loc.pt))}" title="${esc(title)}">${esc(loc.place)}${coords}</button>`
+      : `<span class="loc ${cls}${loc.inside ? ' inside' : ''}">${esc(loc.place)}</span>`;
+  }
+
+  // ---------- Chains ----------
+  // Required chains come from DungeonJournal (curated, no optional breadcrumbs).
+  // Otherwise Wowhead's quest series is used, which can include optional steps.
+  function chainFor(q) {
+    const req = J.chains[q.id];
+    if (req?.length) {
+      return { kind: 'required', steps: [...req.map(s => ({ ...s })), { id: q.id, name: q.name, self: true }], after: [] };
+    }
+    const series = (q.series || []).find(s => s.some(x => x.id === q.id));
+    if (!series || series.length < 2) return null;
+    const at = series.findIndex(x => x.id === q.id);
+    return {
+      kind: 'storyline',
+      steps: series.slice(0, at + 1).map(s => ({ ...s, self: s.id === q.id })),
+      after: series.slice(at + 1),
+    };
+  }
+  function chainProgress(chain) {
+    const n = chain.steps.filter(s => done.has(s.id)).length;
+    return { n, total: chain.steps.length, next: chain.steps.find(s => !done.has(s.id)) };
+  }
+
+  // ---------- Filters ----------
   // "Near" = doable at your level, or becomes doable at the next level.
   const questNear = q => q.from <= state.level + 1 && q.to > state.level;
   const rangeNear = (min, max) => min <= state.level + 1 && max >= state.level;
@@ -74,10 +190,12 @@
     if (state.faction !== 'all' && q.side !== 'B' && q.side !== state.faction) return false;
     if (state.share && !q.share) return false;
     if (state.near && !questNear(q)) return false;
+    if (state.hideDone && done.has(q.id)) return false;
     if (state.cls === 'none' && (q.classes || q.profession)) return false;
     if (state.cls && state.cls !== 'none' && q.classes && !q.classes.includes(state.cls)) return false;
     if (state.q) {
-      const hay = `${q.name} ${d ? d.name + ' ' + d.zone : ''} ${q.start || ''} ${q.starts || ''} ${q.wing || ''}`.toLowerCase();
+      const loc = questLocation(q.id);
+      const hay = `${q.name} ${d ? d.name + ' ' + d.zone : ''} ${q.start || ''} ${q.starts || ''} ${q.wing || ''} ${loc?.place || ''}`.toLowerCase();
       if (!hay.includes(state.q)) return false;
     }
     return true;
@@ -121,6 +239,8 @@
     });
   }
 
+  const bookBtn = key => `<button type="button" class="book" data-ref="${key}" title="Quick reference" aria-label="Quick reference: ${esc(byKey[key]?.name)}">📖</button>`;
+
   // ---------- Dungeon timeline ----------
   function renderDungeons() {
     const rows = [];
@@ -136,6 +256,7 @@
       rows.push(`
         <div class="row d${inRange ? ' in-range' : ''}${focus === d.key ? ' selected' : ''}" data-d="${d.key}">
           <div class="label">
+            ${bookBtn(d.key)}
             <a class="name" href="#g-${d.key}" data-jump="${d.key}">${esc(d.name)}${w ? ` <span class="wing-name">· ${esc(w.name)}</span>` : ''}</a>
             ${d.type === 'new' ? '<span class="new-tag">New</span>' : ''}
             <span class="spacer"></span>
@@ -152,29 +273,112 @@
   }
 
   // ---------- Quest timeline ----------
+  function chainBadge(q, chain) {
+    if (!chain) return '';
+    const { n, total } = chainProgress(chain);
+    const label = chain.kind === 'required' ? 'Required quest chain' : 'Storyline (Wowhead)';
+    return `<span class="chain-badge${n === total ? ' complete' : ''}${chain.kind === 'storyline' ? ' storyline' : ''}" title="${label}: ${n} of ${total} done">⛓ ${n}/${total}</span>`;
+  }
+
   function questRow(q) {
     const [fc, fl, ft] = SIDE[q.side] || SIDE.B;
     const diff = diffAt(q, state.level);
-    const tags = (q.flags || []).map(f => FLAG[f] ? `<span class="tag" title="${FLAG[f][1]}">${FLAG[f][0]}</span>` : '').join('');
+    const chain = chainFor(q);
+    const tags = (q.flags || []).filter(f => !(chain && f === 'pre'))
+      .map(f => FLAG[f] ? `<span class="tag" title="${FLAG[f][1]}">${FLAG[f][0]}</span>` : '').join('');
     const cls = (q.classes || []).map(c => `<span class="tag tag-class c-${esc(c)}" title="${esc(c)} only">${esc(c)}</span>`).join('');
     const prof = q.profession ? `<span class="tag tag-class c-prof" title="${esc(q.profession)} only">${esc(q.profession)}</span>` : '';
-    const share = q.share
-      ? '<span class="ico ico-share" title="Shareable">⇄</span>'
-      : '<span class="ico ico-noshare" title="Not shareable">⇄</span>';
+    const share = q.share == null
+      ? '<span class="ico ico-unknown" title="Shareability unknown">?</span>'
+      : q.share ? '<span class="ico ico-share" title="Shareable">⇄</span>'
+                : '<span class="ico ico-noshare" title="Not shareable">⇄</span>';
     const runsOn = q.to > LMAX + 1;
     const notches = [q.yellow, q.green]
       .filter(v => v != null && v > q.from && v < Math.min(q.to, LMAX + 1))
       .map(v => `<i class="notch" style="left:${((v - q.from) / (Math.min(q.to, LMAX + 1) - q.from)) * 100}%"></i>`).join('');
     const doable = state.level >= q.from && state.level < q.to;
+    const isDone = done.has(q.id);
+    const isOpen = open.has(q.id);
     return `
-      <div class="row q${doable ? '' : ' dim'}">
+      <div class="row q${doable ? '' : ' dim'}${isDone ? ' done' : ''}${isOpen ? ' open' : ''}" data-q="${q.id}">
         <div class="label">
           <span class="fac ${fc}" title="${ft}">${fl}</span>
-          <a class="name d-${diff}" href="${WOWHEAD}${q.id}" target="_blank" rel="noopener">${esc(q.name)}</a>
-          ${cls}${prof}${tags}${share}
+          <a class="name d-${diff}" href="#q-${q.id}" data-open="${q.id}" data-tip="q:${q.idx}" aria-expanded="${isOpen}">${isDone ? '<span class="done-mark" aria-label="Completed">✓</span>' : ''}${esc(q.name)}</a>
+          ${cls}${prof}${chainBadge(q, chain)}${tags}${share}
+          <span class="spacer"></span>
+          ${locHTML(questLocation(q.id), 'row-loc')}
         </div>
         <div class="track">
-          <span class="bar quest${runsOn ? ' runs-on' : ''}" style="${barStyle(q.from, q.to)}" tabindex="0" data-tip="q:${q.idx}">${notches}${q.from}–${q.to}</span>
+          <span class="bar quest${runsOn ? ' runs-on' : ''}${q.estimated ? ' estimated' : ''}" style="${barStyle(q.from, q.to)}" tabindex="0" data-tip="q:${q.idx}">${notches}${q.from}–${q.to}</span>
+        </div>
+      </div>
+      ${isOpen ? drawerHTML(q, chain) : ''}`;
+  }
+
+  function stepHTML(s, nextId) {
+    const sq = questById.get(s.id);
+    const a = J.quests[s.id];
+    const loc = s.map ? { place: s.map.label || ZONES[s.map.mapID], pt: pointFrom(s.map) } : questLocation(s.id);
+    const lvl = s.level ?? sq?.level ?? a?.level;
+    const req = s.requires ?? sq?.req ?? a?.requires;
+    const objective = s.objective || a?.objective;
+    const pickup = s.pickup || a?.pickup;
+    const isDone = done.has(s.id);
+    const name = s.itemStep
+      ? `<span class="step-name">${esc(s.name)}</span>`
+      : `<a class="step-name" href="${WOWHEAD}quest=${s.id}" target="_blank" rel="noopener">${esc(s.name)}</a>`;
+    return `
+      <li class="step${isDone ? ' done' : ''}${s.self ? ' self' : ''}">
+        <label class="check"><input type="checkbox" data-done="${s.id}"${isDone ? ' checked' : ''}><span class="sr">Completed</span></label>
+        <div class="step-body">
+          <div class="step-head">
+            ${name}
+            ${s.self ? '<span class="tag tag-self">This quest</span>' : ''}
+            ${s.itemStep ? '<span class="tag">Item step</span>' : ''}
+            ${!isDone && s.id === nextId ? '<span class="tag tag-next">Next</span>' : ''}
+            ${lvl ? `<span class="step-lvl">Lv ${lvl}${req ? ` · req ${req}` : ''}</span>` : ''}
+          </div>
+          ${pickup && !s.self ? `<div class="step-line"><b>Start:</b> ${esc(pickup)}</div>` : ''}
+          ${loc && !s.self ? `<div class="step-line">${locHTML(loc)}</div>` : ''}
+          ${objective && !s.self ? `<div class="step-line dim">${esc(objective)}</div>` : ''}
+          ${s.note ? `<div class="step-line note">${esc(s.note)}</div>` : ''}
+        </div>
+      </li>`;
+  }
+
+  function drawerHTML(q, chain) {
+    const a = J.quests[q.id] || {};
+    const loc = questLocation(q.id);
+    const prog = chain && chainProgress(chain);
+    const isDone = done.has(q.id);
+    return `
+      <div class="row drawer" data-drawer="${q.id}">
+        <div class="drawer-body">
+          <div class="drawer-head">
+            <label class="check big"><input type="checkbox" data-done="${q.id}"${isDone ? ' checked' : ''}> <span>${isDone ? 'Completed' : 'Mark complete'}</span></label>
+            <a class="wow-btn small" href="${WOWHEAD}quest=${q.id}" target="_blank" rel="noopener">Wowhead ↗</a>
+            <button type="button" class="wow-btn small" data-ref="${q.d}">📖 ${esc(byKey[q.d]?.name || 'Dungeon')}</button>
+            <button type="button" class="close-x" data-open="${q.id}" aria-label="Close details">✕</button>
+          </div>
+          <div class="drawer-grid">
+            <div>
+              <h4>Pick up</h4>
+              <p>${esc(loc?.npc || q.start || '')}${loc ? ` — ${locHTML(loc)}` : ''}</p>
+              ${a.pickup ? `<p class="dim">${esc(a.pickup)}</p>` : q.starts ? `<p class="dim">${esc(q.starts)}</p>` : ''}
+              ${a.objective ? `<h4>Objective</h4><p>${esc(a.objective)}</p>` : ''}
+              ${a.turnin ? `<h4>Turn in</h4><p>${esc(a.turnin)}</p>` : ''}
+              ${a.note ? `<p class="note">${esc(a.note)}</p>` : ''}
+              ${a.rewards ? `<h4>Rewards</h4><p class="pre">${esc(a.rewards)}</p>` : ''}
+              ${q.estimated ? '<p class="dim">Difficulty colours are estimated from the quest level (not yet on Wowhead).</p>' : ''}
+            </div>
+            ${chain ? `
+            <div>
+              <h4>${chain.kind === 'required' ? 'Required quest chain' : 'Storyline'} <span class="dim">· ${prog.n}/${prog.total} done</span></h4>
+              ${chain.kind === 'storyline' ? '<p class="dim small">From Wowhead’s quest series — may include optional breadcrumb steps.</p>' : '<p class="dim small">Every step is required to unlock this quest (DungeonJournal).</p>'}
+              <ol class="chain">${chain.steps.map(s => stepHTML(s, prog.next?.id)).join('')}</ol>
+              ${chain.after.length ? `<h4>Continues with</h4><ol class="chain after">${chain.after.map(s => stepHTML(s, null)).join('')}</ol>` : ''}
+            </div>` : ''}
+          </div>
         </div>
       </div>`;
   }
@@ -182,7 +386,7 @@
   function renderQuests() {
     const out = [];
     let shown = 0;
-    const filtering = state.faction !== 'all' || state.share || state.cls || state.q;
+    const filtering = state.faction !== 'all' || state.share || state.cls || state.q || state.hideDone;
 
     const groups = [...DUNGEONS].sort((a, b) => a.min - b.min || a.max - b.max);
     for (const d of groups) {
@@ -198,13 +402,16 @@
         `<span class="bar dungeon ghost" style="${barStyle(w.min, w.max + 1)}"></span>`).join('');
       const g = [];
       out.push(`<div class="qgroup${focus === d.key ? ' focus' : ''}" data-d="${d.key}">`, g, '</div>');
+      const doneCount = all.filter(q => done.has(q.id)).length;
       g.push(`
         <div class="row group-head${isCollapsed ? ' collapsed' : ''}" id="g-${d.key}">
           <div class="label" role="button" tabindex="0" aria-expanded="${!isCollapsed}" data-toggle="${d.key}">
             <span class="caret">▼</span>
+            ${bookBtn(d.key)}
             <span class="name">${esc(d.name)}</span>
             ${d.type === 'new' ? '<span class="new-tag">New</span>' : ''}
             <span class="spacer"></span>
+            ${doneCount ? `<span class="gcount done-count" title="Completed">✓ ${doneCount}</span>` : ''}
             <span class="gcount">${all.length ? (vis.length === all.length ? all.length : `${vis.length}/${all.length}`) : '—'}</span>
           </div>
           <div class="track">${ranges}</div>
@@ -248,17 +455,23 @@
     if (q.classes) flags.unshift(`${q.classes.join(' / ')} only`);
     if (q.profession) flags.unshift(`${q.profession} only`);
     if (q.races) flags.push(`Races: ${q.races.join(', ')}`);
+    const loc = questLocation(q.id);
+    const chain = chainFor(q);
+    const prog = chain && chainProgress(chain);
+    const share = q.share == null ? '<div class="t-dim">Shareability unknown</div>'
+      : `<div class="${q.share ? 't-green' : 't-red'}">${q.share ? 'Shareable' : 'Not shareable'}</div>`;
     return `
-      <div class="t-title d-${diff}">${esc(q.name)}</div>
+      <div class="t-title d-${diff}">${done.has(q.id) ? '✓ ' : ''}${esc(q.name)}</div>
+      ${loc ? `<div class="t-loc">📍 ${esc(loc.place)}${loc.pt ? ` <b>${fmt(loc.pt.x)}, ${fmt(loc.pt.y)}</b>` : ''}</div>` : ''}
+      ${loc?.npc ? `<div class="t-dim">${esc(loc.npc)}</div>` : ''}
       <div class="t-gold">${esc(d ? d.name : '')}${q.wing ? ` · ${esc(q.wing)}` : ''}</div>
       <div>Level ${q.level} · Requires level ${q.req}</div>
       <div>${side}</div>
-      <div class="${q.share ? 't-green' : 't-red'}">${q.share ? 'Shareable' : 'Not shareable'}</div>
+      ${share}
       <div class="t-diff">${steps.map(([c, n, v]) => `<span class="${c}">${v}<small>${n}</small></span>`).join('')}</div>
-      <div class="t-sep"></div>
-      ${q.starts ? `<div class="t-dim">Starts: ${esc(q.starts)}</div>` : ''}
+      ${chain ? `<div class="t-sep"></div><div class="t-chain">⛓ ${chain.kind === 'required' ? 'Required chain' : 'Storyline'}: ${prog.n}/${prog.total} done${prog.next && !prog.next.self ? ` · next: <b>${esc(prog.next.name)}</b>` : ''}</div>` : ''}
       ${flags.length ? `<div class="t-note">${flags.map(esc).join(' · ')}</div>` : ''}
-      <div class="t-dim" style="margin-top:4px">Doable from ${q.from} until it greys out at ${q.to}.</div>`;
+      <div class="t-dim" style="margin-top:4px">${q.estimated ? 'Estimated: ' : ''}Doable from ${q.from} until it greys out at ${q.to}. Click for details.</div>`;
   }
 
   function dungeonTip(d, wingName) {
@@ -308,21 +521,54 @@
     if (e.target.closest('[data-tip]') && !e.relatedTarget?.closest?.('[data-tip]')) hideTip();
   });
   document.addEventListener('focusin', e => {
-    const el = e.target.closest('[data-tip]');
+    const el = e.target.closest('.bar[data-tip]');
     if (el) { const r = el.getBoundingClientRect(); showTip(el, r.left, r.bottom); }
   });
   document.addEventListener('focusout', hideTip);
   addEventListener('scroll', hideTip, { passive: true });
 
+  // ---------- Copy /way ----------
+  async function copyWay(btn) {
+    const text = btn.dataset.way;
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const ta = Object.assign(document.createElement('textarea'), { value: text });
+      document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    toast(`Copied: ${text}`);
+  }
+  let toastTimer = 0;
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 1800);
+  }
+
   // ---------- Interaction ----------
   document.addEventListener('click', e => {
-    const bar = e.target.closest('[data-tip]');
+    const way = e.target.closest('[data-way]');
+    if (way) { e.preventDefault(); e.stopPropagation(); copyWay(way); return; }
+    const ref = e.target.closest('[data-ref]');
+    if (ref) { e.preventDefault(); e.stopPropagation(); hideTip(); openReference(ref.dataset.ref); return; }
+    const opener = e.target.closest('[data-open]');
+    if (opener) {
+      e.preventDefault(); hideTip(); toggleDrawer(+opener.dataset.open); return;
+    }
+    const goto = e.target.closest('[data-goto]');
+    if (goto) { e.preventDefault(); gotoQuest(+goto.dataset.goto); return; }
+    const floorBtn = e.target.closest('[data-floor]');
+    if (floorBtn) { showFloor(+floorBtn.dataset.floor); return; }
+
+    const bar = e.target.closest('.bar[data-tip]');
     if (bar && e.pointerType !== 'mouse') {          // touch: tap to show
       const r = bar.getBoundingClientRect();
       showTip(bar, e.clientX || r.left, e.clientY || r.bottom);
       return;
     }
     if (bar && bar.dataset.tip.startsWith('d:')) selectDungeon(bar.dataset.tip.split(':')[1]);
+    if (bar && bar.dataset.tip.startsWith('q:')) toggleDrawer(QUESTS[+bar.dataset.tip.split(':')[1]].id);
     const jump = e.target.closest('[data-jump]');
     if (jump) { e.preventDefault(); selectDungeon(jump.dataset.jump); }
     if (e.target.closest('#clear-focus')) setFocus(null);
@@ -330,11 +576,43 @@
     if (tog) toggle(tog.dataset.toggle);
     if (!bar) hideTip();
   });
+  document.addEventListener('change', e => {
+    const cb = e.target.closest('[data-done]');
+    if (!cb) return;
+    const id = +cb.dataset.done;
+    cb.checked ? done.add(id) : done.delete(id);
+    save();
+    rerenderKeepingScroll();
+    if (ref.open) renderReference(ref.dataset.key);
+  });
   document.addEventListener('keydown', e => {
     const tog = e.target.closest?.('[data-toggle]');
-    if (tog && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(tog.dataset.toggle); }
-    if (e.key === 'Escape') { hideTip(); setFocus(null); }
+    if (tog && (e.key === 'Enter' || e.key === ' ') && !e.target.closest('[data-ref]')) { e.preventDefault(); toggle(tog.dataset.toggle); }
+    if (e.key === 'Escape' && !ref.open) { hideTip(); setFocus(null); }
   });
+
+  function rerenderKeepingScroll() {
+    const y = scrollY;
+    renderAll();
+    scrollTo(0, y);
+  }
+  function toggleDrawer(id) {
+    open.has(id) ? open.delete(id) : open.add(id);
+    rerenderKeepingScroll();
+  }
+  function gotoQuest(id) {
+    const q = questById.get(id);
+    if (!q) return;
+    if (ref.open) ref.close();
+    open.add(id);
+    collapsed.delete(q.d);
+    if (!questVisible(q)) {         // make sure it's on screen even if filters would hide it
+      state.near = false; state.search = ''; state.q = ''; state.hideDone = false;
+      syncControls(); save();
+    }
+    renderAll();
+    document.querySelector(`.row.q[data-q="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 
   function toggle(key) {
     collapsed.has(key) ? collapsed.delete(key) : collapsed.add(key);
@@ -363,7 +641,115 @@
     if (focus) btn.textContent = `Clear highlight: ${byKey[focus]?.name ?? ''}`;
   }
 
-  // Controls
+  // ---------- Dungeon quick reference ----------
+  const ref = $('#ref');
+  let refFloor = 1;
+
+  function openReference(key) {
+    refFloor = 1;
+    renderReference(key);
+    if (!ref.open) ref.showModal();
+    ref.querySelector('.ref-body').scrollTop = 0;
+  }
+  ref.addEventListener('click', e => { if (e.target === ref) ref.close(); });   // click backdrop to close
+
+  function showFloor(n) {
+    refFloor = n;
+    renderReference(ref.dataset.key);
+  }
+
+  function mapHTML(jd) {
+    const m = jd?.map;
+    if (!m) return '';
+    if (!m.floors.length) {
+      const byFloor = {};
+      m.bosses.forEach(b => (byFloor[b.floor] ||= []).push(b.name));
+      return `<div class="ref-nomap"><p class="dim">This map uses the game’s own dungeon art, which isn’t bundled with DungeonJournal, so there’s no image here yet.</p>
+        ${Object.entries(byFloor).map(([f, names]) => `<p><b>Level ${f}:</b> ${names.map(esc).join(', ')}</p>`).join('')}</div>`;
+    }
+    const floors = m.floors.filter(Boolean);
+    const fl = m.floors[refFloor - 1] || floors[0];
+    const bossNo = new Map(m.bosses.map((b, i) => [b, i + 1]));
+    const pins = m.bosses.filter(b => b.floor === refFloor).map(b =>
+      `<span class="pin boss" style="left:${b.x * 100}%;top:${b.y * 100}%" title="${esc(b.name)}"><i>${bossNo.get(b)}</i><em>${esc(b.name)}</em></span>`).join('');
+    const ent = m.entrance && m.entrance.floor === refFloor
+      ? `<span class="pin entrance" style="left:${m.entrance.x * 100}%;top:${m.entrance.y * 100}%" title="Entrance"><i style="transform:rotate(${-(m.entrance.angle || 0)}deg)">➜</i><em>Entrance</em></span>` : '';
+    const trans = (m.transitions || []).filter(t => t.floor === refFloor).map(t =>
+      `<button type="button" class="pin stairs" style="left:${t.x * 100}%;top:${t.y * 100}%" data-floor="${t.to}" title="To level ${t.to}"><i>⇅</i><em>Level ${t.to}</em></button>`).join('');
+    const tabs = m.floors.length > 1
+      ? `<div class="floor-tabs">${m.floors.map((f, i) => f ? `<button type="button" class="wow-btn small${i + 1 === refFloor ? ' active' : ''}" data-floor="${i + 1}">Level ${i + 1}</button>` : '').join('')}</div>` : '';
+    return `${tabs}
+      <div class="map-wrap" style="aspect-ratio:${fl.width}/${fl.height}">
+        <img src="${fl.image}" alt="${esc(jd.name)} map, level ${refFloor}" loading="lazy">
+        ${ent}${trans}${pins}
+      </div>
+      <p class="dim small"><a href="${fl.image}" target="_blank" rel="noopener">Open full-size map ↗</a></p>`;
+  }
+
+  function renderReference(key) {
+    const d = byKey[key];
+    const jd = J.dungeons[key];
+    ref.dataset.key = key;
+    const g = d.guide;
+    const quests = QUESTS.filter(q => q.d === key).sort((a, b) => a.from - b.from || a.name.localeCompare(b.name));
+    const entrance = jd?.entrance ? { place: jd.entrance.label || ZONES[jd.entrance.mapID], pt: pointFrom(jd.entrance) } : null;
+    const routeFor = jd?.route && (state.faction === 'all' || state.faction === (jd.route.faction === 'Horde' ? 'H' : 'A'));
+    const bosses = jd?.bosses || [];
+    const bossNo = new Map((jd?.map?.bosses || []).map((b, i) => [b.name, i + 1]));
+
+    ref.innerHTML = `
+      <div class="ref-frame">
+        <header class="ref-head">
+          <div>
+            <h2>${esc(d.name)} ${d.type === 'new' ? '<span class="new-tag">New</span>' : ''}</h2>
+            <p class="dim">Levels ${d.min}–${d.max} · ${esc(jd?.location || d.zone)}</p>
+          </div>
+          <button type="button" class="close-x" onclick="this.closest('dialog').close()" aria-label="Close">✕</button>
+        </header>
+        <div class="ref-body">
+          <div class="ref-cols">
+            <section>
+              ${jd?.description || d.note ? `<p class="ref-desc">${esc(jd?.description || d.note)}</p>` : ''}
+              ${entrance ? `<h3>Entrance</h3><p>${locHTML(entrance)}</p>${jd.entrance.detail ? `<p class="dim">${esc(jd.entrance.detail)}</p>` : ''}` : `<h3>Location</h3><p>${esc(d.zone)}</p>`}
+              ${g ? `<h3>Suggested levels</h3><div class="t-diff ref-diff">
+                <span class="d-red">${g.hard}<small>Hard</small></span>
+                <span class="d-orange">${g.medium}<small>Medium</small></span>
+                <span class="d-yellow">${g.at}<small>At level</small></span>
+                ${g.easy ? `<span class="d-green">${g.easy}<small>Easy</small></span>` : ''}</div>` : ''}
+              ${mapHTML(jd)}
+            </section>
+            <section>
+              ${bosses.length ? `<h3>Bosses</h3><ol class="bosses">${bosses.map(b => `
+                <li>
+                  <details>
+                    <summary>${bossNo.has(b.name) ? `<span class="pin-no">${bossNo.get(b.name)}</span>` : '<span class="pin-no blank"></span>'}<b>${esc(b.name)}</b>${b.level ? ` <span class="dim">Lv ${esc(b.level)}</span>` : ''}${b.loot?.length ? ` <span class="dim small">· ${b.loot.length} drops</span>` : ''}</summary>
+                    ${b.loot?.length ? `<ul class="loot">${b.loot.map(it => `<li><a class="${QUALITY[it.quality] || ''}" href="${WOWHEAD}item=${it.id}" target="_blank" rel="noopener">${esc(it.name)}</a> <span class="dim small">${esc(it.slot || '')}</span></li>`).join('')}</ul>` : ''}
+                  </details>
+                </li>`).join('')}</ol>` : ''}
+              <h3>Quests <span class="dim">· ${quests.filter(q => done.has(q.id)).length}/${quests.length} done</span></h3>
+              ${quests.length ? `<ul class="ref-quests">${quests.map(q => {
+                const [fc, fl, ft] = SIDE[q.side] || SIDE.B;
+                const chain = chainFor(q);
+                return `<li class="${done.has(q.id) ? 'done' : ''}">
+                  <label class="check"><input type="checkbox" data-done="${q.id}"${done.has(q.id) ? ' checked' : ''}><span class="sr">Completed</span></label>
+                  <span class="fac ${fc}" title="${ft}">${fl}</span>
+                  <a href="#" class="d-${diffAt(q, state.level)}" data-goto="${q.id}">${esc(q.name)}</a>
+                  <span class="dim small">${q.from}–${q.to}</span>
+                  ${chainBadge(q, chain)}
+                  <span class="spacer"></span>
+                  ${locHTML(questLocation(q.id))}
+                </li>`;
+              }).join('')}</ul>` : '<p class="dim">No quest data yet.</p>'}
+              ${routeFor ? `<h3>${esc(jd.route.title)}</h3><ol class="route">${jd.route.steps.map(s => `
+                <li><b>${esc(s.title)}</b><p>${esc(s.text)}</p>${s.map ? locHTML({ place: s.map.label, pt: pointFrom(s.map) }) : ''}</li>`).join('')}</ol>` : ''}
+              ${!jd ? '<p class="dim small">No DungeonJournal data for this dungeon yet.</p>' : `<p class="dim small">Bosses, map and route from ${esc(J.source || 'DungeonJournal')}.</p>`}
+            </section>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ---------- Controls ----------
   const levelInput = $('#level');
   const levelOut = $('#level-out');
   function syncControls() {
@@ -374,6 +760,7 @@
     });
     $('#share').checked = state.share;
     $('#near').checked = state.near;
+    $('#hide-done').checked = state.hideDone;
     $('#cls').value = state.cls;
     $('#search').value = state.search;
   }
@@ -399,6 +786,7 @@
   }));
   $('#share').addEventListener('change', e => { state.share = e.target.checked; renderAll(); save(); });
   $('#near').addEventListener('change', e => { state.near = e.target.checked; renderAll(); save(); });
+  $('#hide-done').addEventListener('change', e => { state.hideDone = e.target.checked; renderAll(); save(); });
   $('#cls').addEventListener('change', e => { state.cls = e.target.value; renderAll(); save(); });
   $('#search').addEventListener('input', e => {
     state.search = e.target.value;
