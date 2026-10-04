@@ -20,17 +20,22 @@
   }));
 
   // ---------- State ----------
-  const defaults = { level: 15, faction: 'all', type: 'all', share: false, near: true, q: '', collapsed: [] };
+  // Every setting is remembered in this browser between visits.
+  const defaults = { level: 15, faction: 'all', type: 'all', cls: '', share: false, near: true, search: '', collapsed: [] };
   const state = { ...defaults, ...load() };
+  state.q = state.search.trim().toLowerCase();   // normalised search, derived from `search`
   const collapsed = new Set(state.collapsed);
   let focus = null;   // dungeon key highlighted in the quest timeline
 
   function load() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+      return Object.fromEntries(Object.entries(saved).filter(([k, v]) => k in defaults && typeof v === typeof defaults[k]));
+    } catch { return {}; }
   }
   function save() {
     try {
-      const { q, ...rest } = state;
+      const { q, collapsed: _, ...rest } = state;
       localStorage.setItem(STORE_KEY, JSON.stringify({ ...rest, collapsed: [...collapsed] }));
     } catch { /* storage unavailable */ }
   }
@@ -69,6 +74,8 @@
     if (state.faction !== 'all' && q.side !== 'B' && q.side !== state.faction) return false;
     if (state.share && !q.share) return false;
     if (state.near && !questNear(q)) return false;
+    if (state.cls === 'none' && (q.classes || q.profession)) return false;
+    if (state.cls && state.cls !== 'none' && q.classes && !q.classes.includes(state.cls)) return false;
     if (state.q) {
       const hay = `${q.name} ${d ? d.name + ' ' + d.zone : ''} ${q.start || ''} ${q.starts || ''} ${q.wing || ''}`.toLowerCase();
       if (!hay.includes(state.q)) return false;
@@ -175,7 +182,7 @@
   function renderQuests() {
     const out = [];
     let shown = 0;
-    const filtering = state.faction !== 'all' || state.share || state.q;
+    const filtering = state.faction !== 'all' || state.share || state.cls || state.q;
 
     const groups = [...DUNGEONS].sort((a, b) => a.min - b.min || a.max - b.max);
     for (const d of groups) {
@@ -367,6 +374,8 @@
     });
     $('#share').checked = state.share;
     $('#near').checked = state.near;
+    $('#cls').value = state.cls;
+    $('#search').value = state.search;
   }
 
   function renderAll() {
@@ -390,7 +399,12 @@
   }));
   $('#share').addEventListener('change', e => { state.share = e.target.checked; renderAll(); save(); });
   $('#near').addEventListener('change', e => { state.near = e.target.checked; renderAll(); save(); });
-  $('#search').addEventListener('input', e => { state.q = e.target.value.trim().toLowerCase(); renderAll(); });
+  $('#cls').addEventListener('change', e => { state.cls = e.target.value; renderAll(); save(); });
+  $('#search').addEventListener('input', e => {
+    state.search = e.target.value;
+    state.q = state.search.trim().toLowerCase();
+    renderAll(); save();
+  });
   $('#expand-all').addEventListener('click', () => { collapsed.clear(); save(); renderQuests(); placeYou(); });
   $('#collapse-all').addEventListener('click', () => { DUNGEONS.forEach(d => collapsed.add(d.key)); save(); renderQuests(); placeYou(); });
 
