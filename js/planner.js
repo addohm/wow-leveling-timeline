@@ -487,7 +487,60 @@
   const addForm = kind => document.querySelector(`form[data-add="${kind}"]`);
   const field = (form, f) => form.querySelector(`[data-f="${f}"]`);
 
+  // ---------- Add all dungeons ----------
+  const missingDungeons = () => [...DUNGEONS]
+    .filter(d => !plan.steps.some(s => s.t === 'dungeon' && s.k === d.key))
+    .sort((a, b) => a.min - b.min || a.max - b.max);
+
+  function renderAddAll() {
+    const n = missingDungeons().length;
+    const btn = $('#p-add-all');
+    btn.disabled = !n;
+    btn.textContent = n ? `Add all dungeons (${n})` : 'All dungeons added';
+  }
+
+  // Themed replacement for confirm(). Resolves true when the player confirms.
+  function confirmBox(title, bodyHTML, okLabel) {
+    const dlg = $('#confirm');
+    dlg.querySelector('h2').textContent = title;
+    dlg.querySelector('.confirm-body').innerHTML = bodyHTML;
+    dlg.querySelector('.confirm-ok').textContent = okLabel;
+    dlg.returnValue = '';
+    dlg.showModal();
+    dlg.querySelector('.confirm-ok').focus();
+    return new Promise(resolve => {
+      const form = dlg.querySelector('form');
+      const finish = ok => {
+        form.removeEventListener('submit', onSubmit);
+        dlg.removeEventListener('cancel', onCancel);
+        dlg.removeEventListener('close', onClose);
+        resolve(ok);
+      };
+      const onSubmit = e => finish(e.submitter?.value === 'ok');   // Cancel / confirm buttons
+      const onCancel = () => finish(false);                         // Escape
+      const onClose = () => finish(dlg.returnValue === 'ok');       // anything else that closes it
+      form.addEventListener('submit', onSubmit);
+      dlg.addEventListener('cancel', onCancel);
+      dlg.addEventListener('close', onClose);
+    });
+  }
+
+  $('#p-add-all').addEventListener('click', async () => {
+    const missing = missingDungeons();
+    if (!missing.length) return;
+    const ok = await confirmBox(
+      `Add ${missing.length} dungeon${missing.length === 1 ? '' : 's'}?`,
+      `<p>Each one goes into your route as a single point at its suggested level:</p>
+       <ul>${missing.map(d => `<li>${esc(d.name)} <span class="dim">· level ${suggestedLevel(d)}</span></li>`).join('')}</ul>
+       <p class="dim small">Drag a point’s handles to stretch it over the levels you’ll spend there.</p>`,
+      'Add dungeons');
+    if (!ok) return;
+    change(() => missing.forEach(d => plan.steps.push(newStep('dungeon', d.key, null, suggestedLevel(d)))));
+    toast(`Added ${missing.length} dungeon${missing.length === 1 ? '' : 's'} to your route`);
+  });
+
   function renderAddSelects() {
+    renderAddAll();
     const zones = ZONES.filter(z => z.side === 'C' || z.side === plan.faction).sort((a, b) => a.min - b.min || a.name.localeCompare(b.name));
     const dungeons = [...DUNGEONS].sort((a, b) => a.min - b.min || a.max - b.max);
     fillSelect(addForm('zone'), zones.map(z => `<option value="zone:${z.key}">${esc(z.name)} (${z.min}–${z.max})</option>`).join('')

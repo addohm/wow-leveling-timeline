@@ -44,6 +44,8 @@ step itself to move it. A step whose min and max are the same is a single point.
 - **Dungeon steps** list the quests to pick up before the run, grouped by where they start.
   Untick quests you'll skip. Name colours show each quest's difficulty at the level you enter.
   A dungeon starts as a single point at its suggested level; drag its handles to stretch it.
+  **Add all dungeons** (next to Add dungeon) adds every dungeon not yet in the route this way,
+  after a confirmation listing them.
 - **Custom steps** are anything else, with your own name.
 - **Warnings**: flags under-leveled dungeons, quests still red or already grey when you get
   there, zones you'll outlevel, and levels nothing in the route covers (shaded).
@@ -82,7 +84,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=10`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=11`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally

@@ -733,7 +733,24 @@ dialog.ref {
   border-image: linear-gradient(180deg, #e0b84c, #6b4f1d 50%, #b8902f) 1;
   box-shadow: 0 0 0 1px #000, 0 20px 60px rgba(0,0,0,.8);
 }
-dialog.ref::backdrop { background: rgba(0, 0, 0, .7); }
+dialog.ref::backdrop, dialog.confirm::backdrop { background: rgba(0, 0, 0, .7); }
+
+/* Themed confirmation box (replaces the browser's confirm()) */
+dialog.confirm {
+  width: min(460px, calc(100vw - 32px));
+  padding: 18px 20px 16px;
+  color: var(--ink);
+  background: linear-gradient(180deg, #2a2014, var(--panel) 40%);
+  border: 3px solid transparent;
+  border-image: linear-gradient(180deg, #e0b84c, #6b4f1d 50%, #b8902f) 1;
+  box-shadow: 0 0 0 1px #000, 0 20px 60px rgba(0,0,0,.8);
+}
+dialog.confirm h2 { margin: 0 0 10px; font: 700 20px/1.2 "Cinzel", serif; color: var(--gold); text-shadow: 0 2px 0 #000; }
+.confirm-body p { margin: 0 0 8px; }
+.confirm-body ul { margin: 0 0 8px; padding-left: 20px; max-height: 40vh; overflow: auto; font-size: 14px; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.confirm-actions .wow-btn:first-child { filter: saturate(.35) brightness(.8); }
+#p-add-all:disabled { filter: saturate(0) brightness(.6); cursor: default; }
 .ref-frame { display: flex; flex-direction: column; max-height: calc(100vh - 38px); }
 .ref-head {
   display: flex;
