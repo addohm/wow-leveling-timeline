@@ -3,6 +3,18 @@
 (() => {
   'use strict';
 
+  // ---------- Tabs ----------
+  // Wired up first so switching tabs still works if anything below fails.
+  const TAB_KEY = 'forever-tab';
+  let renderPlanner = null;
+  function showTab(name) {
+    document.querySelectorAll('[data-view]').forEach(el => { el.hidden = el.dataset.view !== name; });
+    document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+    try { localStorage.setItem(TAB_KEY, name); } catch { /* storage unavailable */ }
+    if (name === 'planner') renderPlanner?.();
+  }
+  document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
   const T = window.ForeverTimeline;
   if (!T) return;
   const { DUNGEONS, QUESTS, questById, byKey, done, diffAt, questLocation, locHTML, esc, toast } = T;
@@ -10,7 +22,6 @@
   const zoneByKey = Object.fromEntries(ZONES.map(z => [z.key, z]));
 
   const STORE_KEY = 'forever-planner-v1';
-  const TAB_KEY = 'forever-tab';
   const WOWHEAD = 'https://www.wowhead.com/forever/';
   const CLASSES = ['Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior'];
   const FACTION = { A: 'Alliance', H: 'Horde' };
@@ -695,15 +706,7 @@
   // Quests marked complete on the timeline show as done here too.
   document.addEventListener('forever:done', () => { if (!$('#planner').hidden) render(); });
 
-  // ---------- Tabs ----------
-  function showTab(name) {
-    document.querySelectorAll('[data-view]').forEach(el => { el.hidden = el.dataset.view !== name; });
-    document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
-    try { localStorage.setItem(TAB_KEY, name); } catch { /* storage unavailable */ }
-    if (name === 'planner') render();
-  }
-  document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
-
+  renderPlanner = render;
   let startTab = 'timeline';
   try { startTab = localStorage.getItem(TAB_KEY) === 'planner' ? 'planner' : 'timeline'; } catch { /* storage unavailable */ }
   if (importFromHash()) startTab = 'planner';

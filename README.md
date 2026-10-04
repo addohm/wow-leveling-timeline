@@ -94,6 +94,11 @@ fetched are cached for 12 hours, so a rerun only fetches what's missing.
 To change dungeon ranges, or to add one, edit `data/dungeons.js`. A new dungeon's `key` must
 match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
+## Releasing changes
+
+`index.html` loads the CSS and scripts with a version query (`?v=3`). Bump it whenever you change
+any of them, so browsers don't mix a cached old file with new ones.
+
 ## Run locally
 
 Open `index.html` in a browser. No server is needed.
