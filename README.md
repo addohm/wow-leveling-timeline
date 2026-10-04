@@ -95,6 +95,11 @@ Push to `main`, then in the repo go to **Settings → Pages → Build and deploy
 **Deploy from a branch**, and select `main` / `(root)`. The site will be at
 `https://addohm.github.io/wow-leveling-timeline/`.
 
+## Credits
+
+Some inspiration was taken from the [DungeonJournal](https://www.curseforge.com/wow/addons/dungeonjournal)
+addon for WoW: Forever.
+
 ---
 
 Not affiliated with Blizzard Entertainment or Wowhead. World of Warcraft is a trademark of Blizzard Entertainment.
