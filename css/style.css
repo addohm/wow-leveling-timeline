@@ -929,8 +929,8 @@ input.num { width: 72px; }
   background: #3a1e10;
   border: 1px solid #8a3a12;
 }
-.prange { flex: none; color: var(--ink-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
-input.num.pend { width: 54px; padding: 2px 4px; font-size: 14px; }
+input.num.plv { width: 50px; padding: 2px 4px; font-size: 14px; }
+.row.pstep.custom .pname { color: #e6d3a3; }
 
 .pbar {
   position: absolute;
@@ -952,16 +952,37 @@ input.num.pend { width: 54px; padding: 2px 4px; font-size: 14px; }
 .pbar.zone { background: linear-gradient(180deg, var(--zone-hi), var(--zone) 60%, #1d5f80); }
 .pbar.dungeon { background: linear-gradient(180deg, var(--dungeon-hi), var(--dungeon) 60%, #2b7d2b); }
 .pbar.dungeon.is-new { border-color: #ffd100; }
-.pdiamond {
+.pbar.custom { background: linear-gradient(180deg, #f3e6c0, #c9b27a 60%, #8f7a48); }
+.pbar.point { top: 7px; bottom: 7px; padding: 0; border-radius: 50%; }
+.pbar, .ph { touch-action: none; }
+.pbar[data-drag=move] { cursor: grab; }
+.row.pstep.dragging .pbar { cursor: grabbing; filter: brightness(1.25); }
+
+/* Drag handles on either side of a step */
+.ph {
   position: absolute;
-  top: 50%;
+  top: 6px; bottom: 6px;
   z-index: 2;
-  width: 11px; height: 11px;
-  margin: -6px 0 0 -6px;
-  transform: rotate(45deg);
-  background: linear-gradient(135deg, var(--quest-hi), var(--quest));
-  border: 1px solid #000;
+  width: 8px;
+  cursor: ew-resize;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, var(--gold-dim) 0 1px, transparent 1px 3px) center / 5px 60% no-repeat, rgba(20, 14, 8, .85);
+  border: 1px solid var(--gold-edge);
+  opacity: .35;
+  transition: opacity .12s;
 }
+.row.pstep:hover .ph, .row.pstep.dragging .ph, .ph:focus-visible { opacity: 1; }
+@media (hover: none) { .ph { opacity: .8; } }
+
+.grid .gap {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: repeating-linear-gradient(135deg, rgba(255, 26, 26, .1) 0 6px, transparent 6px 12px);
+}
+.sw-point { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(180deg, var(--dungeon-hi), var(--dungeon)); }
+.sw-custom { background: linear-gradient(180deg, #f3e6c0, #c9b27a); }
+.sw-gap { background: repeating-linear-gradient(135deg, rgba(255, 26, 26, .45) 0 3px, transparent 3px 6px); border: 1px solid rgba(255, 26, 26, .4); }
+#p-summary .pwarn { margin: 0 0 8px; }
 
 .pdrawer .spacer { flex: 1; }
 .pdrawer select { padding: 3px 8px; font-size: 14px; }
@@ -983,7 +1004,12 @@ ul.ref-quests li.skipped a { opacity: .45; text-decoration: line-through; }
 .pdrawer ul.ref-quests .small { white-space: nowrap; }
 
 .add-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
-.add-row select { flex: 0 1 400px; min-width: 240px; }
+.add-row select { flex: 0 1 360px; min-width: 220px; }
+.add-row input[type=text] { flex: 0 1 220px; }
+.add-row .spacer { flex: 1; }
+.lv-field { display: flex; align-items: center; gap: 6px; font: 700 12px/1 "Cinzel", serif; letter-spacing: .08em; color: var(--gold); }
+.lv-field input.num { width: 64px; }
+#p-add-err { margin: 6px 0 0; }
 
 .notes-panel { margin-top: 18px; padding-top: 12px; border-top: 1px solid #3b2f1e; }
 .notes-panel h3 { margin: 0 0 8px; font: 700 18px/1.1 "Cinzel", serif; color: var(--gold); }
@@ -1037,8 +1063,9 @@ footer.frame { margin-top: 26px; margin-bottom: 36px; }
   .checks { padding-bottom: 0; }
   input[type=search] { width: 100%; }
   .control { flex: 1 1 100%; }
-  #route-timeline { --label-w: 200px; --track-min: 360px; }
-  .pnum, .prange, .row.pstep .new-tag, .row.pstep .prep-badge { display: none; }
+  #route-timeline { --label-w: 230px; --track-min: 360px; }
+  .pnum, .row.pstep .new-tag, .row.pstep .prep-badge { display: none; }
+  input.num.plv { width: 42px; }
   .note-form { grid-template-columns: 70px minmax(0, 1fr); }
   .add-row select { flex: 1 1 100%; min-width: 0; }
   .tabs button { padding: 9px 14px; font-size: 13px; }

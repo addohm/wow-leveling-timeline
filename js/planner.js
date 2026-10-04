@@ -1,4 +1,4 @@
-// Route planner: an ordered list of zones and dungeon runs on a level axis, plus notes pinned to a level.
+// Route planner: zones and dungeon runs placed on a level axis, plus notes pinned to a level.
 // Uses the quest and dungeon data that js/app.js exposes as window.ForeverTimeline.
 (() => {
   'use strict';
@@ -18,12 +18,12 @@
   const EXAMPLE = {
     faction: 'A', cls: '', start: 1,
     steps: [
-      { t: 'zone', k: 'dunmorogh', end: 12 },
-      { t: 'dungeon', k: 'hot', end: 14 },
-      { t: 'dungeon', k: 'rol', end: 16 },
-      { t: 'dungeon', k: 'wc', end: 18 },
-      { t: 'zone', k: 'westfall', end: 20 },
-      { t: 'dungeon', k: 'dm', end: 22 },
+      { t: 'zone', k: 'dunmorogh', from: 1, end: 12 },
+      { t: 'dungeon', k: 'hot', from: 12, end: 14 },
+      { t: 'dungeon', k: 'rol', from: 14, end: 16 },
+      { t: 'dungeon', k: 'wc', from: 16, end: 18 },
+      { t: 'zone', k: 'westfall', from: 18, end: 20 },
+      { t: 'dungeon', k: 'dm', from: 20, end: 22 },
     ],
     notes: [{ lv: 13, text: 'Start the sleeping bag chain' }],
   };
@@ -37,9 +37,11 @@
   const uid = () => `p${nextId++}`;
 
   // ---------- Plan state ----------
-  // Steps: { t: 'zone', k, end } or { t: 'dungeon', k, wing?, end, pick: { questId: bool } }.
-  // Each step starts where the previous one ends; the first starts at `start`.
-  // Notes: { lv, text, quest? } pinned to a level, so they stay put when steps are reordered.
+  // Steps: { t: 'zone', k, from, end }, { t: 'dungeon', k, wing?, from, end, pick: { questId: bool } },
+  // or { t: 'custom', name, from, end }.
+  // A step with from === end is a single point on the axis (a dungeon run that doesn't take a whole level).
+  // Steps are kept sorted by level and may overlap, e.g. a dungeon run in the middle of a zone.
+  // Notes: { lv, text, quest? } pinned to a level.
   function clean(p) {
     const out = {
       faction: p?.faction === 'H' ? 'H' : 'A',
@@ -48,15 +50,22 @@
       steps: [],
       notes: [],
     };
+    // Older routes had no `from`: each step started where the previous one ended.
+    let chain = out.start;
     for (const s of Array.isArray(p?.steps) ? p.steps : []) {
+      const from = s?.from != null ? clampInt(s.from, 1, 60, chain) : chain;
+      const end = Math.max(from, clampInt(s?.end, 1, 60, from));
       if (s?.t === 'zone' && zoneByKey[s.k]) {
-        out.steps.push({ id: uid(), t: 'zone', k: s.k, end: clampInt(s.end, 1, 60, 1) });
+        out.steps.push({ id: uid(), t: 'zone', k: s.k, from, end });
       } else if (s?.t === 'dungeon' && byKey[s.k]) {
         const wing = byKey[s.k].wings?.some(w => w.name === s.wing) ? s.wing : undefined;
         const pick = {};
         for (const [id, v] of Object.entries(s.pick || {})) if (/^\d+$/.test(id) && typeof v === 'boolean') pick[id] = v;
-        out.steps.push({ id: uid(), t: 'dungeon', k: s.k, wing, end: clampInt(s.end, 1, 60, 1), pick });
-      }
+        out.steps.push({ id: uid(), t: 'dungeon', k: s.k, wing, from, end, pick });
+      } else if (s?.t === 'custom' && String(s.name ?? '').trim()) {
+        out.steps.push({ id: uid(), t: 'custom', name: String(s.name).trim().slice(0, 60), from, end });
+      } else continue;
+      chain = end;
     }
     for (const n of Array.isArray(p?.notes) ? p.notes : []) {
       const text = String(n?.text ?? '').trim().slice(0, 200);
@@ -64,7 +73,15 @@
       const quest = /^\d{1,7}$/.test(String(n.quest ?? '')) ? String(n.quest) : '';
       out.notes.push({ id: uid(), lv: clampInt(n.lv, 1, 60, 1), text, quest });
     }
+    sortSteps(out);
     return out;
+  }
+
+  // Level order; a zone or longer run comes before a point that starts at the same level.
+  function sortSteps(p) {
+    p.steps = p.steps.map((s, i) => [s, i])
+      .sort(([a, i], [b, j]) => a.from - b.from || (b.end - b.from) - (a.end - a.from) || i - j)
+      .map(([s]) => s);
   }
 
   // What gets saved and shared: the plan without the in-memory ids.
@@ -91,7 +108,6 @@
 
   let plan = load();
   const open = new Set();          // step ids whose details are expanded
-  let lastOpen = null;             // most recently opened step; new steps are inserted after it
 
   // ---------- Share links ----------
   const b64url = {
@@ -119,19 +135,11 @@
   }
 
   // ---------- Derived data ----------
-  const stepName = s => s.t === 'zone' ? zoneByKey[s.k].name : byKey[s.k].name + (s.wing ? ` · ${s.wing}` : '');
+  const stepName = s => s.t === 'custom' ? s.name : s.t === 'zone' ? zoneByKey[s.k].name : byKey[s.k].name + (s.wing ? ` · ${s.wing}` : '');
   const dungeonRange = s => (s.wing && byKey[s.k].wings?.find(w => w.name === s.wing)) || byKey[s.k];
-
-  // Each step's start and (effective) end level.
-  function layout() {
-    let L = plan.start;
-    return plan.steps.map(s => {
-      const from = L;
-      const end = Math.max(s.end, from);
-      L = end;
-      return { s, from, end };
-    });
-  }
+  // Where a dungeon goes when it's dropped in as a point: its suggested level, or a little above its minimum.
+  const suggestedLevel = d => d.guide?.at ?? Math.min(d.max, d.min + 2);
+  const routeEnd = () => plan.steps.reduce((m, s) => Math.max(m, s.end), plan.start);
 
   function prepQuests(s) {
     return QUESTS.filter(q => q.d === s.k
@@ -143,12 +151,14 @@
   const defaultTake = q => !q.profession && !(q.classes && !plan.cls);
   const taking = (s, q) => s.pick?.[q.id] ?? defaultTake(q);
 
-  function warnings({ s, from, end }) {
+  function warnings(s) {
+    const { from, end } = s;
     const w = [];
-    if (s.end < from) w.push(['warn', `Set to end at ${s.end}, but you’re already ${from} here, so it gains no levels.`]);
+    if (s.t === 'custom') return w;
     if (s.t === 'zone') {
       const z = zoneByKey[s.k];
       if (z.side !== 'C' && z.side !== plan.faction) w.push(['warn', `${z.name} is a ${FACTION[z.side]} zone.`]);
+      if (from === end) w.push(['warn', 'Covers no levels. Drag its right handle to stretch it.']);
       if (from > z.max) w.push(['bad', `You’ve outleveled ${z.name} (${z.min}–${z.max}) before you get here.`]);
       else if (from < z.min - 1) w.push(['bad', `Under-leveled: ${z.name} is ${z.min}–${z.max}, and you arrive at ${from}.`]);
       else if (end > z.max + 2) w.push(['warn', `Most quests in ${z.name} go grey after ${z.max + 2}.`]);
@@ -170,26 +180,40 @@
     return w;
   }
 
-  // The step a note falls in: the one covering its level, or the step that ends exactly there.
-  function noteOwner(n, lay) {
-    const i = lay.findIndex(x => n.lv >= x.from && n.lv < x.end);
-    if (i >= 0) return lay[i].s.id;
-    for (let j = lay.length - 1; j >= 0; j--) if (lay[j].end === n.lv) return lay[j].s.id;
-    return null;
+  // Levels between the starting level and the end of the route that no step spans.
+  function gaps() {
+    const out = [];
+    let cursor = plan.start;
+    for (const s of plan.steps) {
+      if (s.end <= s.from) continue;
+      if (s.from > cursor) out.push([cursor, s.from]);
+      cursor = Math.max(cursor, s.end);
+    }
+    const last = routeEnd();
+    if (last > cursor) out.push([cursor, last]);
+    return out;
+  }
+
+  // Steps a note falls in: every step covering its level, or failing that, the steps ending there.
+  function noteOwners(n) {
+    const covering = plan.steps.filter(s => s.from === s.end ? n.lv === s.from : n.lv >= s.from && n.lv < s.end);
+    return covering.length ? covering : plan.steps.filter(s => s.end === n.lv);
   }
 
   // ---------- Rendering ----------
   let AMIN = 1, AMAX = 30;
   const pct = L => ((Math.max(AMIN, Math.min(AMAX, L)) - AMIN) / (AMAX - AMIN)) * 100;
 
-  function axisRange(lay) {
-    const top = Math.max(plan.start, ...lay.map(x => x.end), ...plan.notes.map(n => n.lv));
-    AMIN = Math.max(1, Math.floor((plan.start - 1) / 5) * 5) || 1;
+  function axisRange() {
+    const top = Math.max(routeEnd(), ...plan.notes.map(n => n.lv));
+    const low = Math.min(plan.start, ...plan.steps.map(s => s.from));
+    AMIN = Math.max(1, Math.floor((low - 1) / 5) * 5) || 1;
     AMAX = Math.min(60, Math.max(AMIN + 20, Math.ceil((top + 4) / 5) * 5));
   }
 
   function gridHTML() {
     let h = '<div class="grid" aria-hidden="true">';
+    for (const [a, b] of gaps()) h += `<i class="gap" style="left:${pct(a)}%;width:${pct(b) - pct(a)}%"></i>`;
     for (let L = AMIN; L <= AMAX; L++) h += `<i class="gl${L % 5 === 0 ? ' major' : ''}" style="left:${pct(L)}%"></i>`;
     h += '</div><div class="grid top" aria-hidden="true">';
     for (const n of plan.notes) {
@@ -213,41 +237,52 @@
     return `<div class="row axis"><div class="label">Step</div><div class="track">${ticks}</div></div>`;
   }
 
-  function stepRow(x, i, notesHere) {
-    const { s, from, end } = x;
-    const w = warnings(x);
+  // Bar and handle positions for a level range; a point gets a fixed-size marker with handles beside it.
+  function barGeometry(from, end) {
+    const l = pct(from);
+    if (from === end) {
+      return { bar: `left:calc(${l}% - 9px);width:18px`, hl: `left:calc(${l}% - 17px)`, hr: `left:calc(${l}% + 9px)` };
+    }
+    const r = pct(end);
+    return { bar: `left:${l}%;width:${r - l}%`, hl: `left:calc(${l}% - 8px)`, hr: `left:${r}%` };
+  }
+
+  function barHTML(s) {
+    const g = barGeometry(s.from, s.end);
+    const point = s.from === s.end;
+    const tip = s.t === 'dungeon' ? ` data-tip="d:${s.k}${s.wing ? ':' + esc(s.wing) : ''}"` : ` title="${esc(stepName(s))}: ${s.from}–${s.end}"`;
+    const cls = `pbar ${s.t}${point ? ' point' : ''}${s.t === 'dungeon' && byKey[s.k].type === 'new' ? ' is-new' : ''}`;
+    return `
+      <span class="ph l" style="${g.hl}" data-drag="from" title="Drag to change the start level"></span>
+      <span class="${cls}" style="${g.bar}" data-drag="move"${tip}>${point ? '' : `${s.from}–${s.end}`}</span>
+      <span class="ph r" style="${g.hr}" data-drag="end" title="Drag to change the end level"></span>`;
+  }
+
+  function stepRow(s, i, notesHere) {
+    const w = warnings(s);
     const isOpen = open.has(s.id);
     const worst = w.find(v => v[0] === 'bad') || w[0];
     const warnIco = worst ? `<span class="warn-ico ${worst[0]}" title="${esc(w.map(v => v[1]).join('\n'))}">⚠</span>` : '';
     const noteIco = notesHere.length ? `<span class="note-ico" title="${esc(notesHere.map(n => `${n.lv}: ${n.text}`).join('\n'))}">⚑</span>` : '';
-    const left = pct(from);
-    const width = Math.max(pct(end) - left, 0.8);
-    let bar;
-    if (s.t === 'zone') {
-      bar = `<span class="pbar zone" style="left:${left}%;width:${width}%" title="${esc(stepName(s))}: ${from}–${end}">${from}–${end}</span>`;
-    } else {
-      const qs = prepQuests(s);
-      const n = qs.filter(q => taking(s, q)).length;
-      bar = `<span class="pbar dungeon${byKey[s.k].type === 'new' ? ' is-new' : ''}" style="left:${left}%;width:${width}%" data-tip="d:${s.k}${s.wing ? ':' + esc(s.wing) : ''}">${from}–${end}</span>`
-        + `<span class="pdiamond" style="left:${left}%" title="Pick up ${n} of ${qs.length} quests before the run"></span>`;
-    }
     const prep = s.t === 'dungeon'
       ? (() => { const qs = prepQuests(s); return `<span class="prep-badge" title="Quests you’re taking">⬥ ${qs.filter(q => taking(s, q)).length}/${qs.length}</span>`; })()
       : '';
+    const name = esc(stepName(s));
     return `
       <div class="row pstep ${s.t}${isOpen ? ' open' : ''}" data-sid="${s.id}">
         <div class="label">
           <span class="pnum">${i + 1}</span>
-          <button type="button" class="pname" data-pstep="${s.id}" aria-expanded="${isOpen}">${esc(stepName(s))}</button>
+          <button type="button" class="pname" data-pstep="${s.id}" aria-expanded="${isOpen}">${name}</button>
           ${s.t === 'dungeon' && byKey[s.k].type === 'new' ? '<span class="new-tag">New</span>' : ''}
           ${prep}${warnIco}${noteIco}
           <span class="spacer"></span>
-          <span class="prange">${from} →</span>
-          <input type="number" class="num pend" min="1" max="60" step="1" value="${s.end}" data-end="${s.id}" aria-label="Level you leave ${esc(stepName(s))} at">
+          <input type="number" class="num plv" min="1" max="60" step="1" value="${s.from}" data-from="${s.id}" aria-label="Level you start ${name} at">
+          <span class="dim">→</span>
+          <input type="number" class="num plv" min="1" max="60" step="1" value="${s.end}" data-end="${s.id}" aria-label="Level you leave ${name} at">
         </div>
-        <div class="track" data-pstep="${s.id}">${bar}</div>
+        <div class="track" data-pstep="${s.id}">${barHTML(s)}</div>
       </div>
-      ${isOpen ? drawerHTML(x, w, notesHere) : ''}`;
+      ${isOpen ? drawerHTML(s, w, notesHere) : ''}`;
   }
 
   function prepQuestHTML(s, q, L) {
@@ -266,7 +301,7 @@
       </li>`;
   }
 
-  function dungeonDetail(s, from) {
+  function dungeonDetail(s) {
     const qs = prepQuests(s).sort((a, b) => a.from - b.from || a.name.localeCompare(b.name));
     if (!qs.length) return `<h4>Quest pickups</h4><p class="dim">No ${FACTION[plan.faction]} quest data for this dungeon yet.</p>`;
     // Group by where each quest starts so the pickups read as a route: towns first, inside the dungeon last.
@@ -280,16 +315,17 @@
     const ordered = [...groups.entries()].sort((a, b) => a[1].inside - b[1].inside);
     const n = qs.filter(q => taking(s, q)).length;
     return `
-      <h4>Quest pickups <span class="dim">· taking ${n} of ${qs.length} · name colours show difficulty at ${from}</span></h4>
+      <h4>Quest pickups <span class="dim">· taking ${n} of ${qs.length} · name colours show difficulty at ${s.from}</span></h4>
       ${ordered.map(([place, g]) => `
         <div class="pickup-group">
           <div class="pickup-place">${esc(place)}</div>
-          <ul class="ref-quests">${g.list.map(q => prepQuestHTML(s, q, from)).join('')}</ul>
+          <ul class="ref-quests">${g.list.map(q => prepQuestHTML(s, q, s.from)).join('')}</ul>
         </div>`).join('')}
       <p class="dim small">Untick quests you’ll skip. Click a quest to open it on the timeline, where you can mark it complete.</p>`;
   }
 
-  function zoneDetail(s, from, end) {
+  function zoneDetail(s) {
+    const { from, end } = s;
     const z = zoneByKey[s.k];
     const inRoute = new Set(plan.steps.filter(x => x.t === 'dungeon').map(x => x.k));
     const here = QUESTS.filter(q => {
@@ -322,16 +358,16 @@
               <span class="dim small">${d.min}–${d.max} · ${esc(d.zone)}</span>
               ${inRoute.has(d.key) ? '<span class="tag">In route</span>' : ''}
               <span class="spacer"></span>
-              <button type="button" class="wow-btn small" data-insert="dungeon:${d.key}">Add after this step</button>
+              <button type="button" class="wow-btn small" data-insert="${d.key}">Add at ${Math.max(from, Math.min(end, suggestedLevel(d)))}</button>
             </li>`).join('')}</ul>` : '<p class="dim">None.</p>'}
         </div>
       </div>`;
   }
 
-  function drawerHTML({ s, from, end }, w, notesHere) {
+  function drawerHTML(s, w, notesHere) {
     const d = s.t === 'dungeon' ? byKey[s.k] : null;
     const z = s.t === 'zone' ? zoneByKey[s.k] : null;
-    const sub = z ? `Zone ${z.min}–${z.max}` : `${esc(d.zone)} · ${dungeonRange(s).min}–${dungeonRange(s).max}`;
+    const sub = z ? `Zone ${z.min}–${z.max}` : d ? `${esc(d.zone)} · ${dungeonRange(s).min}–${dungeonRange(s).max}` : 'Custom step';
     const wingSel = d?.wings ? `
       <select data-wing aria-label="Wing">
         <option value="">All wings</option>
@@ -342,18 +378,16 @@
         <div class="drawer-body">
           <div class="drawer-head">
             <b class="pd-title">${esc(stepName(s))}</b>
-            <span class="dim">Levels ${from}–${end} · ${sub}</span>
+            <span class="dim">${s.from === s.end ? `At level ${s.from}` : `Levels ${s.from}–${s.end}`} · ${sub}</span>
             ${wingSel}
             ${d ? `<button type="button" class="wow-btn small" data-ref="${s.k}">📖 Quick reference</button>` : ''}
             <span class="spacer"></span>
-            <button type="button" class="wow-btn small" data-move="-1">▲ Earlier</button>
-            <button type="button" class="wow-btn small" data-move="1">▼ Later</button>
             <button type="button" class="wow-btn small" data-remove>Remove</button>
             <button type="button" class="close-x" data-pstep="${s.id}" aria-label="Close details">✕</button>
           </div>
           ${notesHere.map(n => `<p class="pnote">⚑ <b>At ${n.lv}:</b> ${esc(n.text)}${noteQuestHTML(n)}</p>`).join('')}
           ${w.map(([k, t]) => `<p class="pwarn ${k}">⚠ ${esc(t)}</p>`).join('')}
-          ${d ? dungeonDetail(s, from) : zoneDetail(s, from, end)}
+          ${d ? dungeonDetail(s) : z ? zoneDetail(s) : ''}
         </div>
       </div>`;
   }
@@ -366,21 +400,29 @@
       : ` <a href="${WOWHEAD}quest=${esc(n.quest)}" target="_blank" rel="noopener">Quest ${esc(n.quest)} on Wowhead ↗</a>`;
   }
 
-  function renderNotes(lay) {
-    const byId = Object.fromEntries(lay.map(x => [x.s.id, x.s]));
+  function renderNotes() {
     const list = [...plan.notes].sort((a, b) => a.lv - b.lv);
     $('#p-notes').innerHTML = list.length ? list.map(n => {
-      const owner = noteOwner(n, lay);
+      const owners = noteOwners(n);
       return `
         <li>
           <span class="note-lv">${n.lv}</span>
           <div class="note-body">
             <div>${esc(n.text)}${noteQuestHTML(n)}</div>
-            <div class="dim small">${owner ? `During ${esc(stepName(byId[owner]))}` : 'Outside your route'}</div>
+            <div class="dim small">${owners.length ? `During ${owners.map(s => esc(stepName(s))).join(', ')}` : 'Outside your route'}</div>
           </div>
           <button type="button" class="close-x" data-del-note="${n.id}" aria-label="Remove note">✕</button>
         </li>`;
     }).join('') : '<li class="dim">No notes yet. Pin a reminder to a level, like a quest chain to start or a class trainer visit.</li>';
+  }
+
+  function renderSummary() {
+    const g = gaps();
+    const missing = DUNGEONS.filter(d => !plan.steps.some(s => s.t === 'dungeon' && s.k === d.key)).length;
+    $('#p-add-all').textContent = missing ? `Add all dungeons (${missing})` : 'All dungeons added';
+    $('#p-summary').innerHTML = g.length
+      ? `<p class="pwarn warn">⚠ Nothing planned for ${g.map(([a, b]) => b - a === 1 ? `level ${a}` : `levels ${a}–${b - 1}`).join(', ')}. Shaded on the timeline.</p>`
+      : '';
   }
 
   function renderAddSelect() {
@@ -392,10 +434,27 @@
       <optgroup label="Zones">${zones.map(z => `<option value="zone:${z.key}">${esc(z.name)} (${z.min}–${z.max})</option>`).join('')}</optgroup>
       <optgroup label="Dungeons">${dungeons.map(d => (d.wings
         ? d.wings.map(w => `<option value="dungeon:${d.key}:${esc(w.name)}">${esc(d.name)} · ${esc(w.name)} (${w.min}–${w.max})</option>`).join('')
-        : `<option value="dungeon:${d.key}">${esc(d.name)} (${d.min}–${d.max})</option>`)).join('')}</optgroup>`;
+        : `<option value="dungeon:${d.key}">${esc(d.name)} (${d.min}–${d.max})</option>`)).join('')}</optgroup>
+      <option value="custom">Custom…</option>`;
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
-    const after = plan.steps.find(s => s.id === lastOpen && open.has(s.id));
-    $('#p-add-hint').textContent = after ? `Adds after step ${plan.steps.indexOf(after) + 1}: ${stepName(after)}` : 'Adds to the end of your route';
+    else prefillAdd();
+  }
+
+  // Min and max start out as the chosen location's level range (a dungeon starts as a point at its
+  // suggested level); custom steps start at the end of the route.
+  function prefillAdd() {
+    const [t, k, wing] = $('#p-add').value.split(':');
+    let min, max;
+    if (t === 'zone') ({ min, max } = zoneByKey[k]);
+    else if (t === 'dungeon') {
+      const d = byKey[k];
+      const w = wing && d.wings?.find(x => x.name === wing);
+      min = max = w ? Math.min(w.max, w.min + 2) : suggestedLevel(d);
+    } else { min = routeEnd(); max = Math.min(60, min + 1); }
+    $('#p-add-min').value = min;
+    $('#p-add-max').value = max;
+    $('#p-add-name').hidden = t !== 'custom';
+    $('#p-add-err').textContent = '';
   }
 
   function syncSettings() {
@@ -405,19 +464,16 @@
   }
 
   function render() {
-    const lay = layout();
-    axisRange(lay);
+    axisRange();
     const notesFor = {};
-    for (const n of plan.notes) {
-      const o = noteOwner(n, lay);
-      if (o) (notesFor[o] ||= []).push(n);
-    }
-    const rows = lay.map((x, i) => stepRow(x, i, (notesFor[x.s.id] || []).sort((a, b) => a.lv - b.lv)));
+    for (const n of plan.notes) for (const s of noteOwners(n)) (notesFor[s.id] ||= []).push(n);
+    const rows = plan.steps.map((s, i) => stepRow(s, i, (notesFor[s.id] || []).sort((a, b) => a.lv - b.lv)));
     const y = scrollY;
     $('#route-timeline').innerHTML = gridHTML() + axisHTML() + (rows.length ? rows.join('')
-      : '<div class="no-results">No steps yet. Add a zone or dungeon below, or load the example route.</div>');
+      : '<div class="no-results">No steps yet. Add a zone or dungeon below, add every dungeon at once, or load the example route.</div>');
     scrollTo(0, y);
-    renderNotes(lay);
+    renderSummary();
+    renderNotes();
     renderAddSelect();
     syncSettings();
   }
@@ -425,47 +481,65 @@
   // ---------- Editing ----------
   function change(fn) {
     fn();
+    sortSteps(plan);
     save();
     render();
   }
 
-  function insertStep(value, afterId) {
-    const [t, k, wing] = value.split(':');
-    const lay = layout();
-    let at = plan.steps.length;
-    if (afterId) at = plan.steps.findIndex(s => s.id === afterId) + 1;
-    const from = at > 0 ? lay[at - 1].end : plan.start;
-    let step;
-    if (t === 'zone') {
-      const z = zoneByKey[k];
-      step = { id: uid(), t, k, end: Math.min(60, Math.max(from + 1, Math.min(z.max, from + 4))) };
-    } else {
-      step = { id: uid(), t, k, wing: wing || undefined, end: Math.min(60, from + 1), pick: {} };
-    }
-    change(() => plan.steps.splice(at, 0, step));
-    document.querySelector(`.pstep[data-sid="${step.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  const stepById = id => plan.steps.find(s => s.id === id);
+
+  function newStep(t, k, wing, from, end = from) {
+    if (t === 'zone') return { id: uid(), t, k, from, end };
+    return { id: uid(), t, k, wing: wing || undefined, from, end, pick: {} };
   }
 
-  const stepById = id => plan.steps.find(s => s.id === id);
+  $('#p-add').addEventListener('change', prefillAdd);
+  ['#p-add-name', '#p-add-min', '#p-add-max'].forEach(id => $(id).addEventListener('input', () => { $('#p-add-err').textContent = ''; }));
+  $('#p-add-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const err = $('#p-add-err');
+    err.textContent = '';
+    const [t, k, wing] = $('#p-add').value.split(':');
+    const minRaw = $('#p-add-min').value.trim(), maxRaw = $('#p-add-max').value.trim();
+    const min = Math.round(Number(minRaw)), max = Math.round(Number(maxRaw));
+    const name = $('#p-add-name').value.trim();
+    if (t === 'custom' && !name) { err.textContent = 'Enter a name for the custom step.'; return; }
+    if (!minRaw || !(min >= 1 && min <= 60)) { err.textContent = 'Enter a min level from 1 to 60.'; return; }
+    if (!maxRaw || !(max >= 1 && max <= 60)) { err.textContent = 'Enter a max level from 1 to 60.'; return; }
+    if (max < min) { err.textContent = 'The max level can’t be below the min level.'; return; }
+    const step = t === 'custom'
+      ? { id: uid(), t, name: name.slice(0, 60), from: min, end: max }
+      : newStep(t, k, wing, min, max);
+    change(() => plan.steps.push(step));
+    $('#p-add-name').value = '';
+    document.querySelector(`.pstep[data-sid="${step.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+
+  function addAllDungeons() {
+    const missing = DUNGEONS.filter(d => !plan.steps.some(s => s.t === 'dungeon' && s.k === d.key));
+    if (!missing.length) { toast('Every dungeon is already in your route'); return; }
+    if (!confirm(`Add ${missing.length} dungeons to your route?\n\nEach one goes in as a single point at its suggested level. Drag a point’s handles to stretch it over the levels you’ll spend there.`)) return;
+    change(() => missing.forEach(d => plan.steps.push(newStep('dungeon', d.key, null, suggestedLevel(d)))));
+    toast(`Added ${missing.length} dungeons`);
+  }
 
   document.addEventListener('click', e => {
     // Quest links in the planner open the quest on the timeline: switch tabs before app.js scrolls to it.
-    if (e.target.closest('#planner [data-goto], .notes-panel [data-goto]')) showTab('timeline');
+    if (e.target.closest('#planner [data-goto]')) showTab('timeline');
   }, true);
 
   $('#planner').addEventListener('click', e => {
+    if (suppressClick) { suppressClick = false; return; }
     if (e.target.closest('[data-way], [data-ref], [data-goto], a[href^="http"], input, select, label')) return;
     const ins = e.target.closest('[data-insert]');
-    if (ins) { insertStep(ins.dataset.insert, ins.closest('[data-sid]').dataset.sid); return; }
-    const del = e.target.closest('[data-del-note]');
-    if (del) { change(() => { plan.notes = plan.notes.filter(n => n.id !== del.dataset.delNote); }); return; }
-    const mv = e.target.closest('[data-move]');
-    if (mv) {
-      const i = plan.steps.findIndex(s => s.id === mv.closest('[data-sid]').dataset.sid);
-      const j = i + +mv.dataset.move;
-      if (j >= 0 && j < plan.steps.length) change(() => { [plan.steps[i], plan.steps[j]] = [plan.steps[j], plan.steps[i]]; });
+    if (ins) {
+      const zone = stepById(ins.closest('[data-sid]').dataset.sid);
+      const d = byKey[ins.dataset.insert];
+      change(() => plan.steps.push(newStep('dungeon', d.key, null, Math.max(zone.from, Math.min(zone.end, suggestedLevel(d))))));
       return;
     }
+    const del = e.target.closest('[data-del-note]');
+    if (del) { change(() => { plan.notes = plan.notes.filter(n => n.id !== del.dataset.delNote); }); return; }
     if (e.target.closest('[data-remove]')) {
       const id = e.target.closest('[data-sid]').dataset.sid;
       open.delete(id);
@@ -475,18 +549,22 @@
     const tog = e.target.closest('[data-pstep]');
     if (tog) {
       const id = tog.dataset.pstep;
-      if (open.has(id)) open.delete(id);
-      else { open.add(id); lastOpen = id; }
+      open.has(id) ? open.delete(id) : open.add(id);
       render();
     }
   });
 
   $('#planner').addEventListener('change', e => {
-    const end = e.target.closest('[data-end]');
-    if (end) {
-      const s = stepById(end.dataset.end);
-      if (s && end.value !== '') change(() => { s.end = clampInt(end.value, 1, 60, s.end); });
-      else render();
+    const lv = e.target.closest('[data-from], [data-end]');
+    if (lv) {
+      const s = stepById(lv.dataset.from || lv.dataset.end);
+      if (!s || lv.value === '') { render(); return; }
+      change(() => {
+        const v = clampInt(lv.value, 1, 60, 1);
+        // Keep from <= end by moving the other side along.
+        if (lv.dataset.from) { s.from = v; s.end = Math.max(s.end, v); }
+        else { s.end = v; s.from = Math.min(s.from, v); }
+      });
       return;
     }
     const take = e.target.closest('[data-take]');
@@ -508,13 +586,69 @@
   });
   // Enter in a level box applies it right away.
   $('#planner').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.matches('[data-end]')) e.target.blur();
+    if (e.key === 'Enter' && e.target.matches('[data-from], [data-end]')) e.target.blur();
   });
 
-  $('#p-add-btn').addEventListener('click', () => {
-    const after = plan.steps.find(s => s.id === lastOpen && open.has(s.id));
-    insertStep($('#p-add').value, after?.id);
+  // ---------- Dragging ----------
+  // Handles change one end; dragging the bar itself moves the whole step. Levels snap to whole numbers.
+  // A press on the bar that doesn't move is left to the click handler, which opens the step.
+  let drag = null;
+  let suppressClick = false;
+
+  $('#route-timeline').addEventListener('pointerdown', e => {
+    const h = e.target.closest('[data-drag]');
+    if (!h || e.button !== 0) return;
+    const row = h.closest('[data-sid]');
+    const s = stepById(row.dataset.sid);
+    const track = row.querySelector('.track');
+    drag = { s, mode: h.dataset.drag, x: e.clientX, from: s.from, end: s.end, w: track.getBoundingClientRect().width, row, moved: false };
+    try { h.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+    if (drag.mode !== 'move') e.preventDefault();
   });
+
+  $('#route-timeline').addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x;
+    if (!drag.moved && Math.abs(dx) < 4) return;
+    drag.moved = true;
+    const dl = Math.round((dx / drag.w) * (AMAX - AMIN));
+    let { from, end } = drag;
+    if (drag.mode === 'from') from = Math.max(1, Math.min(end, from + dl));
+    else if (drag.mode === 'end') end = Math.min(60, Math.max(from, end + dl));
+    else {
+      const shift = Math.max(1 - from, Math.min(60 - end, dl));
+      from += shift; end += shift;
+    }
+    drag.next = { from, end };
+    // Update the row in place while dragging; a full render happens on release.
+    const g = barGeometry(from, end);
+    const bar = drag.row.querySelector('.pbar');
+    bar.style.cssText = g.bar;
+    bar.classList.toggle('point', from === end);
+    bar.textContent = from === end ? '' : `${from}–${end}`;
+    drag.row.querySelector('.ph.l').style.cssText = g.hl;
+    drag.row.querySelector('.ph.r').style.cssText = g.hr;
+    drag.row.querySelector('[data-from]').value = from;
+    drag.row.querySelector('[data-end]').value = end;
+    drag.row.classList.add('dragging');
+    T.hideTip?.();
+  });
+
+  function endDrag() {
+    if (!drag) return;
+    const { s, moved, next } = drag;
+    drag = null;
+    if (!moved) return;
+    suppressClick = true;
+    setTimeout(() => { suppressClick = false; }, 0);
+    if (next) change(() => { s.from = next.from; s.end = next.end; });
+    else render();
+  }
+  $('#route-timeline').addEventListener('pointerup', endDrag);
+  $('#route-timeline').addEventListener('pointercancel', endDrag);
+
+  // ---------- Route controls ----------
+  $('#p-add-all').addEventListener('click', addAllDungeons);
 
   $('#p-faction').addEventListener('click', e => {
     const b = e.target.closest('button');

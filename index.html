@@ -152,19 +152,27 @@
         <h2 id="planner-h">Route Planner</h2>
         <ul class="legend">
           <li><i class="sw sw-zone"></i> Zone questing</li>
-          <li><i class="sw sw-prep"></i> Dungeon quest pickups</li>
           <li><i class="sw sw-dungeon"></i> Dungeon run</li>
+          <li><i class="sw sw-point"></i> Single point</li>
+          <li><i class="sw sw-custom"></i> Custom</li>
           <li><i class="sw sw-note"></i> Level note</li>
+          <li><i class="sw sw-gap"></i> Nothing planned</li>
           <li><span class="warn-ico">⚠</span> Warning</li>
         </ul>
       </div>
-      <p class="dim small planner-help">Each step starts where the one before it ends. Set the level you’ll leave each step at, click a step for details, and pin notes to a level. Your route is saved in this browser.</p>
+      <p class="dim small planner-help">Drag the handles on either side of a step to change its levels, or drag the step itself to move it. Click a step for details, and pin notes to a level. Your route is saved in this browser.</p>
+      <div id="p-summary"></div>
       <div class="scroller"><div class="timeline" id="route-timeline"></div></div>
-      <div class="add-row">
-        <select id="p-add" aria-label="Zone or dungeon to add"></select>
-        <button type="button" class="wow-btn" id="p-add-btn">Add to route</button>
-        <span class="dim small" id="p-add-hint"></span>
-      </div>
+      <form class="add-row" id="p-add-form" novalidate>
+        <select id="p-add" aria-label="Location"></select>
+        <input type="text" id="p-add-name" placeholder="Sleeping bag chain" aria-label="Custom step name" maxlength="60" hidden>
+        <label class="lv-field">Min <input type="number" id="p-add-min" class="num" min="1" max="60" step="1"></label>
+        <label class="lv-field">Max <input type="number" id="p-add-max" class="num" min="1" max="60" step="1"></label>
+        <button type="submit" class="wow-btn">Add to route</button>
+        <span class="spacer"></span>
+        <button type="button" class="wow-btn" id="p-add-all">Add all dungeons</button>
+      </form>
+      <p class="form-err" id="p-add-err" role="alert"></p>
 
       <div class="notes-panel">
         <h3>Level notes</h3>

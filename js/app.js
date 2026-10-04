@@ -808,6 +808,6 @@
   // Shared with the route planner (js/planner.js).
   window.ForeverTimeline = {
     DUNGEONS, QUESTS, questById, byKey, done, ZONES,
-    diffAt, questLocation, locHTML, chainFor, chainProgress, esc, toast,
+    diffAt, questLocation, locHTML, chainFor, chainProgress, esc, toast, hideTip,
   };
 })();

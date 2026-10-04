@@ -35,15 +35,19 @@ and the cross-faction travel route where one exists.
 
 ## Route Planner
 
-The **Route Planner** tab lays out your leveling route on a level axis. Each step starts where
-the one before it ends.
+The **Route Planner** tab lays out your leveling route on a level axis. Pick a zone, dungeon or
+custom step, give it a min and max level, and add it. Steps can overlap, like a dungeon run in
+the middle of a zone. Drag the handles on either side of a step to change its levels, or drag the
+step itself to move it. A step whose min and max are the same is a single point.
 
-- **Zone steps**: quest in a zone until a set level. A zone step lists the dungeon quests that
-  start there and the dungeons in range.
-- **Dungeon steps**: a run plus the quests to pick up before it, grouped by where they start.
+- **Zone steps** list the dungeon quests that start in the zone and the dungeons in range.
+- **Dungeon steps** list the quests to pick up before the run, grouped by where they start.
   Untick quests you'll skip. Name colours show each quest's difficulty at the level you enter.
+  **Add all dungeons** drops every dungeon not yet in the route in as a single point at its
+  suggested level.
+- **Custom steps** are anything else, with your own name.
 - **Warnings**: flags under-leveled dungeons, quests still red or already grey when you get
-  there, and zones you'll outlevel.
+  there, zones you'll outlevel, and levels nothing in the route covers (shaded).
 - **Level notes**: reminders pinned to a level, like "at 13, start the sleeping bag chain".
   They stay at that level when you reorder steps. A note can link a Wowhead quest ID.
 - **Share**: *Copy share link* puts the whole route in the URL. Routes are saved in your browser.
