@@ -53,7 +53,7 @@
   // or { t: 'custom', name, from, end }.
   // A step with from === end is a single point on the axis (a dungeon run that doesn't take a whole level).
   // Steps are kept sorted by level and may overlap, e.g. a dungeon run in the middle of a zone.
-  // Notes: { lv, text, quest? } pinned to a level.
+  // Notes: { lv, text, quest?, url? } pinned to a level; `quest` is a Wowhead quest ID, `url` any web link.
   function clean(p) {
     const out = {
       faction: p?.faction === 'H' ? 'H' : 'A',
@@ -83,13 +83,37 @@
       const text = String(n?.text ?? '').trim().slice(0, 200);
       if (!text) continue;
       const quest = /^\d{1,7}$/.test(String(n.quest ?? '')) ? String(n.quest) : '';
-      out.notes.push({ id: uid(), lv: clampInt(n.lv, 1, 60, 1), text, quest });
+      const url = quest ? '' : parseLink(n.url).url || '';
+      out.notes.push({ id: uid(), lv: clampInt(n.lv, 1, 60, 1), text, quest, url });
     }
     sortSteps(out);
     return out;
   }
 
   // Level order; a zone or longer run comes before a point that starts at the same level.
+  // A note's link: a Wowhead quest ID, or an http(s) address. Returns {} when empty, { error } when invalid.
+  function parseLink(raw) {
+    const s = String(raw ?? '').trim();
+    if (!s) return {};
+    if (/^\d{1,7}$/.test(s)) return { quest: s };
+    try {
+      const u = new URL(/^[a-z][\w+.-]*:/i.test(s) ? s : `https://${s}`);
+      if ((u.protocol === 'https:' || u.protocol === 'http:') && u.hostname.includes('.') && u.href.length <= 500) return { url: u.href };
+    } catch { /* not a URL */ }
+    return { error: 'Enter a Wowhead quest ID like 96403, or a web address like https://www.wowhead.com/…' };
+  }
+
+  // Validates note fields; returns the note's values or { error }.
+  function readNote(lvRaw, textRaw, linkRaw) {
+    const lv = Math.round(Number(String(lvRaw).trim()));
+    const text = String(textRaw).trim();
+    if (!String(lvRaw).trim() || !(lv >= 1 && lv <= 60)) return { error: 'Enter a level from 1 to 60.' };
+    if (!text) return { error: 'Enter the note text.' };
+    const link = parseLink(linkRaw);
+    if (link.error) return link;
+    return { lv, text: text.slice(0, 200), quest: link.quest || '', url: link.url || '' };
+  }
+
   function sortSteps(p) {
     p.steps = p.steps.map((s, i) => [s, i])
       .sort(([a, i], [b, j]) => a.from - b.from || (b.end - b.from) - (a.end - a.from) || i - j)
@@ -105,7 +129,7 @@
         if (!s.wing) delete s.wing;
         return s;
       }),
-      notes: p.notes.map(({ id, ...n }) => (n.quest ? n : { lv: n.lv, text: n.text })),
+      notes: p.notes.map(n => ({ lv: n.lv, text: n.text, ...(n.quest && { quest: n.quest }), ...(n.url && { url: n.url }) })),
     };
   }
 
@@ -397,14 +421,19 @@
             <button type="button" class="wow-btn small" data-remove>Remove</button>
             <button type="button" class="close-x" data-pstep="${s.id}" aria-label="Close details">✕</button>
           </div>
-          ${notesHere.map(n => `<p class="pnote">⚑ <b>At ${n.lv}:</b> ${esc(n.text)}${noteQuestHTML(n)}</p>`).join('')}
+          ${notesHere.map(n => `<p class="pnote">⚑ <b>At ${n.lv}:</b> ${esc(n.text)}${noteLinkHTML(n)}</p>`).join('')}
           ${w.map(([k, t]) => `<p class="pwarn ${k}">⚠ ${esc(t)}</p>`).join('')}
           ${d ? dungeonDetail(s) : z ? zoneDetail(s) : ''}
         </div>
       </div>`;
   }
 
-  function noteQuestHTML(n) {
+  function noteLinkHTML(n) {
+    if (n.url) {
+      let host = n.url;
+      try { host = new URL(n.url).hostname.replace(/^www\./, ''); } catch { /* keep the raw link */ }
+      return ` <a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(host)} ↗</a>`;
+    }
     if (!n.quest) return '';
     const q = questById.get(+n.quest);
     return q
@@ -412,17 +441,35 @@
       : ` <a href="${WOWHEAD}quest=${esc(n.quest)}" target="_blank" rel="noopener">Quest ${esc(n.quest)} on Wowhead ↗</a>`;
   }
 
+  let editingNote = null;          // id of the note being edited in place
+
   function renderNotes() {
     const list = [...plan.notes].sort((a, b) => a.lv - b.lv);
     $('#p-notes').innerHTML = list.length ? list.map(n => {
+      if (n.id === editingNote) {
+        return `
+          <li class="note-editing">
+            <form class="note-form" data-edit-note="${n.id}" novalidate>
+              <input type="number" class="num" data-nf="lv" min="1" max="60" step="1" value="${n.lv}" aria-label="Level">
+              <input type="text" data-nf="text" value="${esc(n.text)}" maxlength="200" aria-label="Note">
+              <input type="text" data-nf="link" value="${esc(n.url || n.quest)}" placeholder="Link: quest ID or URL (optional)" maxlength="500" aria-label="Link: Wowhead quest ID or web address">
+              <span class="note-actions">
+                <button type="submit" class="wow-btn small">Save</button>
+                <button type="button" class="wow-btn small" data-cancel-note>Cancel</button>
+              </span>
+            </form>
+            <p class="form-err" data-nf="err" role="alert"></p>
+          </li>`;
+      }
       const owners = noteOwners(n);
       return `
         <li>
           <span class="note-lv">${n.lv}</span>
           <div class="note-body">
-            <div>${esc(n.text)}${noteQuestHTML(n)}</div>
+            <div>${esc(n.text)}${noteLinkHTML(n)}</div>
             <div class="dim small">${owners.length ? `During ${owners.map(s => esc(stepName(s))).join(', ')}` : 'Outside your route'}</div>
           </div>
+          <button type="button" class="wow-btn small" data-edit="${n.id}">Edit</button>
           <button type="button" class="close-x" data-del-note="${n.id}" aria-label="Remove note">✕</button>
         </li>`;
     }).join('') : '<li class="dim">No notes yet. Pin a reminder to a level, like a quest chain to start or a class trainer visit.</li>';
@@ -552,6 +599,9 @@
     }
     const del = e.target.closest('[data-del-note]');
     if (del) { change(() => { plan.notes = plan.notes.filter(n => n.id !== del.dataset.delNote); }); return; }
+    const edit = e.target.closest('[data-edit]');
+    if (edit) { startEditNote(edit.dataset.edit); return; }
+    if (e.target.closest('[data-cancel-note]')) { editingNote = null; renderNotes(); return; }
     if (e.target.closest('[data-remove]')) {
       const id = e.target.closest('[data-sid]').dataset.sid;
       open.delete(id);
@@ -689,18 +739,39 @@
 
   // Notes
   const noteErr = $('#p-note-err');
-  ['#p-note-lv', '#p-note-text', '#p-note-quest'].forEach(id => $(id).addEventListener('input', () => { noteErr.textContent = ''; }));
+  $('#p-note-form').addEventListener('input', () => { noteErr.textContent = ''; });
   $('#p-note-form').addEventListener('submit', e => {
     e.preventDefault();
-    const lvRaw = $('#p-note-lv').value.trim();
-    const lv = Math.round(Number(lvRaw));
-    const text = $('#p-note-text').value.trim();
-    const quest = $('#p-note-quest').value.trim();
-    if (!lvRaw || !Number.isFinite(lv) || lv < 1 || lv > 60) { noteErr.textContent = 'Enter a level from 1 to 60.'; return; }
-    if (!text) { noteErr.textContent = 'Enter the note text.'; return; }
-    if (quest && !/^\d{1,7}$/.test(quest)) { noteErr.textContent = 'The quest ID is the number in the Wowhead link, like 96403.'; return; }
-    change(() => plan.notes.push({ id: uid(), lv, text: text.slice(0, 200), quest }));
+    noteErr.textContent = '';
+    const n = readNote($('#p-note-lv').value, $('#p-note-text').value, $('#p-note-link').value);
+    if (n.error) { noteErr.textContent = n.error; return; }
+    change(() => plan.notes.push({ id: uid(), ...n }));
     $('#p-note-form').reset();
+  });
+
+  // Editing a note in place: Save applies the changes, Cancel or Escape drops them.
+  function startEditNote(id) {
+    editingNote = id;
+    renderNotes();
+    $('#p-notes [data-nf="text"]')?.focus();
+  }
+  $('#p-notes').addEventListener('submit', e => {
+    const form = e.target.closest('[data-edit-note]');
+    if (!form) return;
+    e.preventDefault();
+    const f = name => form.querySelector(`[data-nf="${name}"]`);
+    const n = readNote(f('lv').value, f('text').value, f('link').value);
+    if (n.error) { form.parentElement.querySelector('[data-nf="err"]').textContent = n.error; return; }
+    const note = plan.notes.find(x => x.id === form.dataset.editNote);
+    editingNote = null;
+    change(() => Object.assign(note, n));
+  });
+  $('#p-notes').addEventListener('input', e => {
+    const err = e.target.closest('li')?.querySelector('[data-nf="err"]');
+    if (err) err.textContent = '';
+  });
+  $('#p-notes').addEventListener('keydown', e => {
+    if (e.key === 'Escape' && e.target.closest('[data-edit-note]')) { editingNote = null; renderNotes(); }
   });
 
   // Quests marked complete on the timeline show as done here too.
