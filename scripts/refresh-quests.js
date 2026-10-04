@@ -91,8 +91,22 @@
   }
 
   // 2. Fetch each quest page (throttled; backs off if Wowhead starts refusing).
+  // Results are cached in this browser for 12 hours, so an interrupted run can simply be restarted.
+  const CACHE_KEY = 'forever-timeline-refresh-cache';
+  const MAX_AGE = 12 * 3600 * 1000;
+  let cache = {};
+  try { cache = JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { /* no cache */ }
   const pages = {};
-  const ids = [...new Set(rows.map(r => r.id))];
+  for (const [id, c] of Object.entries(cache)) if (Date.now() - c.at < MAX_AGE) pages[id] = c.page;
+  const persist = () => {
+    try {
+      const out = {};
+      for (const [id, page] of Object.entries(pages)) out[id] = { at: cache[id]?.at || Date.now(), page };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(out));
+    } catch { /* storage full or blocked */ }
+  };
+  const ids = [...new Set(rows.map(r => r.id))].filter(id => !pages[id]);
+  if (Object.keys(pages).length) console.log(`Reusing ${Object.keys(pages).length} cached quest pages; ${ids.length} to fetch.`);
   for (let i = 0; i < ids.length; i += 2) {
     await Promise.all(ids.slice(i, i + 2).map(async id => {
       for (let attempt = 0; attempt < 4; attempt++) {
@@ -103,6 +117,8 @@
             const m = html.match(/printHtml\("(\[ul\]\[li\]Level.*?)", "infobox-contents/);
             if (m) {
               pages[id] = { facts: m[1].replace(/\\\//g, '/'), series: parseSeries(html, id), startAt: parseStart(html) };
+              cache[id] = { at: Date.now() };
+              persist();
               return;
             }
           }
@@ -115,6 +131,8 @@
     await sleep(600);
     if (i % 20 === 0) console.log(`  ${Math.min(i + 2, ids.length)}/${ids.length}`);
   }
+  const missing = rows.filter(r => !pages[r.id]).map(r => r.id);
+  if (missing.length) console.warn(`${missing.length} quests could not be fetched (rate-limited?). Run the script again in a few minutes to fill them in: ${missing.join(', ')}`);
   const facts = Object.fromEntries(Object.entries(pages).map(([id, p]) => [id, p.facts]));
 
   // 3. Parse.
