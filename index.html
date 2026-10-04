@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=23">
+  <link rel="stylesheet" href="css/style.css?v=24">
 </head>
 <body>
   <header class="banner">
@@ -121,8 +121,8 @@
       <div class="control level-control">
         <label for="p-level">Your level</label>
         <div class="level-row">
-          <input type="range" id="p-level" min="1" max="60" value="15">
-          <output id="p-level-out" class="level-out" for="p-level">15</output>
+          <input type="range" id="p-level" min="1" max="60" value="1">
+          <output id="p-level-out" class="level-out" for="p-level">1</output>
         </div>
       </div>
 
@@ -134,8 +134,8 @@
       <div class="control">
         <span class="control-label" id="p-faction-label">Faction</span>
         <div class="seg" role="radiogroup" aria-labelledby="p-faction-label" id="p-faction">
-          <button type="button" role="radio" data-value="A" class="seg-a">Alliance</button>
-          <button type="button" role="radio" data-value="H" class="seg-h">Horde</button>
+          <button type="button" role="radio" data-value="A" class="seg-a" title="Click again to clear">Alliance</button>
+          <button type="button" role="radio" data-value="H" class="seg-h" title="Click again to clear">Horde</button>
         </div>
       </div>
       <div class="control">
@@ -146,10 +146,6 @@
           <option>Paladin</option><option>Priest</option><option>Rogue</option>
           <option>Shaman</option><option>Warlock</option><option>Warrior</option>
         </select>
-      </div>
-      <div class="control">
-        <label for="p-start">Starting level</label>
-        <input type="number" id="p-start" class="num" min="1" max="59" step="1">
       </div>
       <div class="control">
         <span class="control-label">Route</span>
@@ -247,12 +243,12 @@
     </form>
   </dialog>
 
-  <script src="data/dungeons.js?v=23"></script>
-  <script src="data/quests.js?v=23"></script>
-  <script src="data/journal.js?v=23"></script>
-  <script src="data/zones.js?v=23"></script>
-  <script src="js/app.js?v=23"></script>
-  <script src="js/planner.js?v=23"></script>
+  <script src="data/dungeons.js?v=24"></script>
+  <script src="data/quests.js?v=24"></script>
+  <script src="data/journal.js?v=24"></script>
+  <script src="data/zones.js?v=24"></script>
+  <script src="js/app.js?v=24"></script>
+  <script src="js/planner.js?v=24"></script>
   <script>const whTooltips = { colorLinks: false, iconizeLinks: false, renameLinks: false };</script>
   <script src="https://wow.zamimg.com/js/tooltips.js" async></script>
 </body>

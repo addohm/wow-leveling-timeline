@@ -28,7 +28,7 @@
   const FACTION = { A: 'Alliance', H: 'Horde' };
 
   const EXAMPLE = {
-    faction: 'A', cls: '', start: 1,
+    faction: 'A', cls: '',
     steps: [
       { t: 'zone', k: 'dunmorogh', from: 1, end: 12 },
       { t: 'dungeon', k: 'hot', from: 12, end: 14 },
@@ -91,16 +91,18 @@
   // Steps are kept sorted by level and may overlap, e.g. a dungeon run in the middle of a zone.
   // Notes: { lv, text, quest, items: [], video, t } pinned to a level: a Wowhead quest ID, Wowhead
   // item IDs, and a YouTube video ID with an optional start time in seconds.
+  // `faction` is '' when none is chosen. Routes always start at level 1 (`start`); older routes
+  // could start later, which only matters for converting their steps below.
   function clean(p) {
     const out = {
-      faction: p?.faction === 'H' ? 'H' : 'A',
+      faction: FACTION[p?.faction] ? p.faction : '',
       cls: CLASSES.includes(p?.cls) ? p.cls : '',
-      start: clampInt(p?.start, 1, 59, 1),
+      start: 1,
       steps: [],
       notes: [],
     };
     // Older routes had no `from`: each step started where the previous one ended.
-    let chain = out.start;
+    let chain = clampInt(p?.start, 1, 59, 1);
     for (const s of Array.isArray(p?.steps) ? p.steps : []) {
       const from = s?.from != null ? clampInt(s.from, 1, 60, chain) : chain;
       const end = Math.max(from, clampInt(s?.end, 1, 60, from));
@@ -257,7 +259,7 @@
   // What gets saved and shared: the plan without the in-memory ids.
   function portable(p) {
     return {
-      faction: p.faction, cls: p.cls, start: p.start,
+      faction: p.faction, cls: p.cls,
       steps: p.steps.map(({ id, ...s }) => {
         if (s.pick && !Object.keys(s.pick).length) delete s.pick;
         if (!s.wing) delete s.wing;
@@ -340,7 +342,7 @@
 
   function prepQuests(s) {
     return QUESTS.filter(q => q.d === s.k
-      && (q.side === 'B' || q.side === plan.faction)
+      && (q.side === 'B' || !plan.faction || q.side === plan.faction)
       && (!s.wing || !q.wing || q.wing === s.wing)
       && !(q.classes && plan.cls && !q.classes.includes(plan.cls)));
   }
@@ -354,7 +356,7 @@
     if (s.t === 'custom') return w;
     if (s.t === 'zone') {
       const z = zoneByKey[s.k];
-      if (z.side !== 'C' && z.side !== plan.faction) w.push(['warn', `${z.name} is a ${FACTION[z.side]} zone.`]);
+      if (plan.faction && z.side !== 'C' && z.side !== plan.faction) w.push(['warn', `${z.name} is a ${FACTION[z.side]} zone.`]);
       if (from === end) w.push(['warn', 'Covers no levels. Drag its right handle to stretch it.']);
       if (from > z.max) w.push(['bad', `You’ve outleveled ${z.name} (${z.min}–${z.max}) before you get here.`]);
       else if (from < z.min - 1) w.push(['bad', `Under-leveled: ${z.name} is ${z.min}–${z.max}, and you arrive at ${from}.`]);
@@ -403,18 +405,19 @@
   const pct = L => ((Math.max(AMIN, Math.min(AMAX, L)) - AMIN) / (AMAX - AMIN)) * 100;
 
   // ---------- Level filter ----------
-  // "Your level" is shared with the Timeline tab. The planner can hide or fade route steps outside
+  // The planner has its own "your level" (starting at 1). It can hide or fade route steps outside
   // your level (+2), always keeping at least MIN_SHOWN of them: when fewer are in range, the steps
-  // nearest that range fill in. These settings, and whether the notes are collapsed, are the
-  // planner's own and remembered per browser.
+  // nearest that range fill in. These settings, and whether the notes are collapsed, are remembered
+  // per browser.
   const VIEW_KEY = 'forever-planner-view';
-  const view = { near: false, fadeFar: false, notesCollapsed: false };
+  const view = { level: 1, near: false, fadeFar: false, notesCollapsed: false };
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY)) || {};
-    for (const k of Object.keys(view)) if (typeof v[k] === 'boolean') view[k] = v[k];
+    for (const k of Object.keys(view)) if (typeof v[k] === typeof view[k]) view[k] = v[k];
+    view.level = clampInt(view.level, 1, 60, 1);
   } catch { /* storage unavailable */ }
   const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch { /* storage unavailable */ } };
-  const myLevel = () => T.getLevel?.() ?? 15;
+  const myLevel = () => view.level;
   const AHEAD = 2, MIN_SHOWN = 5;
   // How many levels a step is from the window [L, L + AHEAD]; 0 when it overlaps.
   const stepDistance = (s, L) => (s.end < L ? L - s.end : s.from > L + AHEAD ? s.from - (L + AHEAD) : 0);
@@ -445,7 +448,7 @@
     }
     for (const n of plan.notes) {
       if (n.lv >= AMIN && n.lv <= AMAX) {
-        ticks += `<span class="note-flag" style="left:${pct(n.lv)}%" title="Level ${n.lv}: ${esc(n.text)}">⚑</span>`;
+        ticks += `<button type="button" class="note-flag" style="left:${pct(n.lv)}%" data-note-jump="${n.id}" title="Level ${n.lv}: ${esc(n.text)}" aria-label="Go to note at level ${n.lv}: ${esc(n.text)}">⚑</button>`;
       }
     }
     return `<div class="row axis"><div class="label">Step</div><div class="track">${ticks}</div></div>`;
@@ -477,7 +480,9 @@
     const isOpen = open.has(s.id);
     const worst = w.find(v => v[0] === 'bad') || w[0];
     const warnIco = worst ? `<span class="warn-ico ${worst[0]}" title="${esc(w.map(v => v[1]).join('\n'))}">⚠</span>` : '';
-    const noteIco = notesHere.length ? `<span class="note-ico" title="${esc(notesHere.map(n => `${n.lv}: ${n.text}`).join('\n'))}">⚑</span>` : '';
+    const noteIco = notesHere.length
+      ? `<button type="button" class="note-ico" data-note-jump="${notesHere[0].id}" title="${esc(notesHere.map(n => `${n.lv}: ${n.text}`).join('\n'))}" aria-label="Go to this step's notes">⚑</button>`
+      : '';
     const prep = s.t === 'dungeon'
       ? (() => { const qs = prepQuests(s); return `<span class="prep-badge" title="Quests you’re taking">⬥ ${qs.filter(q => taking(s, q)).length}/${qs.length}</span>`; })()
       : '';
@@ -517,7 +522,7 @@
 
   function dungeonDetail(s) {
     const qs = prepQuests(s).sort((a, b) => a.from - b.from || a.name.localeCompare(b.name));
-    if (!qs.length) return `<h4>Quest pickups</h4><p class="dim">No ${FACTION[plan.faction]} quest data for this dungeon yet.</p>`;
+    if (!qs.length) return `<h4>Quest pickups</h4><p class="dim">No ${plan.faction ? `${FACTION[plan.faction]} ` : ''}quest data for this dungeon yet.</p>`;
     // Group by where each quest starts so the pickups read as a route: towns first, inside the dungeon last.
     const groups = new Map();
     for (const q of qs) {
@@ -543,7 +548,7 @@
     const z = zoneByKey[s.k];
     const inRoute = new Set(plan.steps.filter(x => x.t === 'dungeon').map(x => x.k));
     const here = QUESTS.filter(q => {
-      if (q.side !== 'B' && q.side !== plan.faction) return false;
+      if (plan.faction && q.side !== 'B' && q.side !== plan.faction) return false;
       if (q.classes && plan.cls && !q.classes.includes(plan.cls)) return false;
       if (diffAt(q, from) === 'grey') return false;
       const loc = questLocation(q.id);
@@ -599,7 +604,7 @@
             <button type="button" class="wow-btn small" data-remove>Remove</button>
             <button type="button" class="close-x" data-pstep="${s.id}" aria-label="Close details">✕</button>
           </div>
-          ${notesHere.map(n => `<p class="pnote">⚑ <b>At ${n.lv}:</b> ${esc(n.text)}${noteLinkHTML(n)}</p>`).join('')}
+          ${notesHere.map(n => `<p class="pnote"><button type="button" class="note-jump" data-note-jump="${n.id}" title="Go to this note">⚑ <b>At ${n.lv}:</b> ${esc(n.text)}</button>${noteLinkHTML(n)}</p>`).join('')}
           ${w.map(([k, t]) => `<p class="pwarn ${k}">⚠ ${esc(t)}</p>`).join('')}
           ${d ? dungeonDetail(s) : z ? zoneDetail(s) : ''}
         </div>
@@ -712,7 +717,7 @@
       }
       const owners = noteOwners(n);
       return `
-        <li>
+        <li data-note-id="${n.id}">
           <span class="note-lv">${n.lv}</span>
           <div class="note-body">
             <div>${esc(n.text)}${noteLinkHTML(n)}</div>
@@ -791,7 +796,7 @@
 
   function renderAddSelects() {
     renderAddAll();
-    const zones = ZONES.filter(z => z.side === 'C' || z.side === plan.faction).sort((a, b) => a.min - b.min || a.name.localeCompare(b.name));
+    const zones = ZONES.filter(z => !plan.faction || z.side === 'C' || z.side === plan.faction).sort((a, b) => a.min - b.min || a.name.localeCompare(b.name));
     const dungeons = [...DUNGEONS].sort((a, b) => a.min - b.min || a.max - b.max);
     fillSelect(addForm('zone'), zones.map(z => `<option value="zone:${z.key}">${esc(z.name)} (${z.min}–${z.max})</option>`).join('')
       + '<option value="custom">Custom…</option>');
@@ -828,7 +833,6 @@
   function syncSettings() {
     document.querySelectorAll('#p-faction button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.value === plan.faction)));
     $('#p-cls').value = plan.cls;
-    $('#p-start').value = plan.start;
     $('#p-level').value = myLevel();
     $('#p-level-out').textContent = myLevel();
     $('#p-near').checked = view.near;
@@ -906,6 +910,8 @@
   $('#planner').addEventListener('click', e => {
     if (suppressClick) { suppressClick = false; return; }
     if (e.target.closest('[data-way], [data-ref], [data-goto], a[href^="http"], input, select, label')) return;
+    const jump = e.target.closest('[data-note-jump]');
+    if (jump) { jumpToNote(jump.dataset.noteJump); return; }
     const ins = e.target.closest('[data-insert]');
     if (ins) {
       const zone = stepById(ins.closest('[data-sid]').dataset.sid);
@@ -1029,17 +1035,17 @@
 
   $('#p-faction').addEventListener('click', e => {
     const b = e.target.closest('button');
-    if (b) change(() => { plan.faction = b.dataset.value; });
+    if (b) change(() => { plan.faction = plan.faction === b.dataset.value ? '' : b.dataset.value; });   // click again to clear
   });
   $('#p-cls').addEventListener('change', e => change(() => { plan.cls = e.target.value; }));
-  $('#p-start').addEventListener('change', e => change(() => { plan.start = clampInt(e.target.value, 1, 59, plan.start); }));
 
   // Level slider and filters (see "Level filter").
   let levelRaf = 0;
   $('#p-level').addEventListener('input', e => {
     const L = clampInt(e.target.value, 1, 60, myLevel());
     $('#p-level-out').textContent = L;
-    T.setLevel?.(L);
+    view.level = L;
+    saveView();
     cancelAnimationFrame(levelRaf);
     levelRaf = requestAnimationFrame(render);
   });
@@ -1048,6 +1054,18 @@
     if (view.near) view.fadeFar = false;
     saveView(); render();
   });
+  // Clicking a note's flag (timeline axis, a step's ⚑, or its line in a step's details) opens the
+  // notes section if needed, scrolls to the note and flashes it.
+  function jumpToNote(id) {
+    if (view.notesCollapsed) { view.notesCollapsed = false; saveView(); renderNotes(); }
+    const li = document.querySelector(`#p-notes [data-note-id="${id}"]`);
+    if (!li) return;
+    li.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    li.classList.remove('flash');
+    void li.offsetWidth;            // restart the animation if it's already running
+    li.classList.add('flash');
+  }
+
   $('#p-notes-toggle').addEventListener('click', () => {
     view.notesCollapsed = !view.notesCollapsed;
     saveView(); renderNotes();

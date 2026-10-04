@@ -911,7 +911,8 @@ input.num { width: 72px; }
 .sw-note { width: 0; height: 16px; border-left: 2px dashed var(--note); border-radius: 0; }
 .warn-ico { flex: none; color: var(--warn); font-size: 14px; cursor: help; }
 .warn-ico.bad { color: var(--d-red); }
-.note-ico { flex: none; color: var(--note); font-size: 14px; cursor: help; }
+.note-ico { flex: none; padding: 0; font: inherit; font-size: 14px; color: var(--note); background: none; border: 0; cursor: pointer; }
+.note-ico:hover, .note-flag:hover { color: #e2b8ff; }
 .planner-help { margin: 0 0 10px; }
 
 #route-timeline { --label-w: 410px; --track-min: 720px; }
@@ -921,10 +922,14 @@ input.num { width: 72px; }
   position: absolute;
   top: 1px;
   transform: translateX(-3px);
+  z-index: 1;
+  padding: 0;
   color: var(--note);
   font-size: 14px;
   line-height: 1;
-  cursor: help;
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
 .grid .note-line {
   position: absolute;
@@ -1026,6 +1031,10 @@ input.num.plv { width: 50px; padding: 2px 4px; font-size: 14px; }
 .pwarn.bad { color: var(--d-red); }
 .pnote { margin: 0 0 4px; }
 .pnote, .pnote b { color: var(--note); }
+.note-jump { padding: 0; font: inherit; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
+.note-jump:hover { text-decoration: underline; }
+.note-list li.flash { animation: note-flash 1.8s ease-out; }
+@keyframes note-flash { from { background: rgba(199, 125, 255, .35); } to { background: transparent; } }
 .pickup-group { margin: 4px 0 10px; }
 .pickup-place {
   margin-bottom: 2px;

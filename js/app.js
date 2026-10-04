@@ -852,8 +852,5 @@
   window.ForeverTimeline = {
     DUNGEONS, QUESTS, questById, byKey, done, ZONES,
     diffAt, questLocation, locHTML, chainFor, chainProgress, esc, toast, hideTip, renderAll,
-    // The planner shares "your level"; the Timeline re-renders when its tab is shown again.
-    getLevel: () => state.level,
-    setLevel(L) { state.level = L; syncControls(); save(); },
   };
 })();
