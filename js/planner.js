@@ -490,11 +490,11 @@
   function renderAddSelects() {
     const zones = ZONES.filter(z => z.side === 'C' || z.side === plan.faction).sort((a, b) => a.min - b.min || a.name.localeCompare(b.name));
     const dungeons = [...DUNGEONS].sort((a, b) => a.min - b.min || a.max - b.max);
-    fillSelect(addForm('zone'), zones.map(z => `<option value="zone:${z.key}">${esc(z.name)}</option>`).join('')
+    fillSelect(addForm('zone'), zones.map(z => `<option value="zone:${z.key}">${esc(z.name)} (${z.min}–${z.max})</option>`).join('')
       + '<option value="custom">Custom…</option>');
     fillSelect(addForm('dungeon'), dungeons.map(d => (d.wings
-      ? d.wings.map(w => `<option value="dungeon:${d.key}:${esc(w.name)}">${esc(d.name)} · ${esc(w.name)}</option>`).join('')
-      : `<option value="dungeon:${d.key}">${esc(d.name)}</option>`)).join(''));
+      ? d.wings.map(w => `<option value="dungeon:${d.key}:${esc(w.name)}">${esc(d.name)} · ${esc(w.name)} (${w.min}–${w.max})</option>`).join('')
+      : `<option value="dungeon:${d.key}">${esc(d.name)} (${d.min}–${d.max})</option>`)).join(''));
   }
   function fillSelect(form, html) {
     const sel = field(form, 'pick');
