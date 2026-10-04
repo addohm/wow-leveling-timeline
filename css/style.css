@@ -1067,6 +1067,7 @@ ul.ref-quests li.skipped a { opacity: .45; text-decoration: line-through; }
 .note-help { margin: 2px 0 0; }
 .note-help code { color: var(--ink); font-size: 12px; }
 .note-links a { white-space: nowrap; }
+.note-detail { color: var(--ink-dim); font-style: italic; }
 .note-form { display: grid; grid-template-columns: 80px minmax(0, 2fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .form-err { min-height: 1.2em; margin: 4px 0 0; font-size: 14px; color: var(--d-red); }
 

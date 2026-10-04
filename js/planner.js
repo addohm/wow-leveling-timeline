@@ -37,14 +37,20 @@
       { t: 'zone', k: 'westfall', from: 18, end: 20 },
       { t: 'dungeon', k: 'dm', from: 20, end: 22 },
     ],
-    notes: [{ lv: 13, text: 'Start the sleeping bag chain', links: ['79008'] }],
   };
 
-  // Notes every planner starts with. Each is added once per browser (tracked by DEFAULTS_KEY), so
-  // deleting one keeps it gone. Bump DEFAULTS_VERSION when adding a new default note.
-  const DEFAULT_NOTES = [{ lv: 13, text: 'Start the sleeping bag chain', links: ['79008'] }];
+  // Notes every planner starts with. They're added once per browser (tracked by DEFAULTS_KEY), so
+  // deleting one keeps it gone. To change the defaults, edit DEFAULT_NOTES, move the old wording to
+  // OLD_DEFAULT_NOTES (so untouched copies get updated), and bump DEFAULTS_VERSION.
+  const DEFAULT_NOTES = [{
+    lv: 14,
+    text: 'Sleeping bag chain begins for exp boost and bag',
+    links: ['79008', 'https://www.youtube.com/watch?v=tILWPzAyqLQ', '3% exp buff and 12 slot bag'],
+  }];
+  const OLD_DEFAULT_NOTES = [{ lv: 13, text: 'Start the sleeping bag chain' }];
   const DEFAULTS_KEY = 'forever-planner-defaults';
-  const DEFAULTS_VERSION = 1;
+  const DEFAULTS_VERSION = 2;
+  EXAMPLE.notes = DEFAULT_NOTES;
 
   const $ = sel => document.querySelector(sel);
   const clampInt = (v, lo, hi, dflt) => {
@@ -60,7 +66,7 @@
   // A step with from === end is a single point on the axis (a dungeon run that doesn't take a whole level).
   // Steps are kept sorted by level and may overlap, e.g. a dungeon run in the middle of a zone.
   // Notes: { lv, text, links: [] } pinned to a level; each link is a Wowhead quest ID, a web address,
-  // or text to search Wowhead for.
+  // or plain text shown as is.
   function clean(p) {
     const out = {
       faction: p?.faction === 'H' ? 'H' : 'A',
@@ -98,22 +104,23 @@
     return out;
   }
 
-  // One entry from a note's links: a Wowhead quest ID, an http(s) address, or anything else as a
-  // Wowhead search. Returns { link } with the normalised entry, {} when empty, or { error }.
+  // One entry from a note's links: a Wowhead quest ID, an http(s) address (https:// is optional), or
+  // anything else as plain text. Returns { link } with the normalised entry, {} when empty, or { error }.
   const MAX_LINKS = 10;
   function parseLink(raw) {
     const s = String(raw ?? '').trim();
     if (!s) return {};
     if (/^\d{1,7}$/.test(s)) return { link: s };
-    const scheme = /^[a-z][\w+.-]*:/i.test(s);
-    if (scheme || /^[^\s/]+\.[a-z]{2,}(?:[/?#:]|$)/i.test(s)) {
+    if (/^(?:javascript|data|vbscript|file):/i.test(s)) return { error: `“${s.slice(0, 40)}” isn’t a web address starting with http:// or https://.` };
+    const scheme = /^https?:\/\//i.test(s);
+    if (scheme || /^[^\s/:]+\.[a-z]{2,}(?:[/?#:]|$)/i.test(s)) {
       try {
         const u = new URL(scheme ? s : `https://${s}`);
-        if ((u.protocol === 'https:' || u.protocol === 'http:') && u.hostname.includes('.') && u.href.length <= 500) return { link: u.href };
+        if (u.hostname.includes('.') && u.href.length <= 500) return { link: u.href };
       } catch { /* not a URL */ }
-      return { error: `“${s.slice(0, 40)}” isn’t a web address starting with http:// or https://.` };
+      return { error: `“${s.slice(0, 40)}” isn’t a valid web address.` };
     }
-    return { link: s.slice(0, 80) };
+    return { link: s.slice(0, 120) };
   }
   // A comma-separated list of links, like "79008, https://youtube.com/…, linkens boomerang".
   function parseLinks(raw) {
@@ -167,18 +174,24 @@
     catch { /* storage unavailable */ }
   }
 
-  // A note already about the same thing (same quest, or a sleeping bag note without a link) gets
-  // the default's link instead of a duplicate.
+  // An untouched copy of an older default is updated to the new wording. A browser that has never had
+  // the defaults gets them added, unless a note about the same thing (same link, or an unlinked
+  // sleeping bag note) is already there, which gets the default's details instead.
   function addDefaultNotes(p) {
     let seen = 0;
     try { seen = Number(localStorage.getItem(DEFAULTS_KEY)) || 0; } catch { /* storage unavailable */ }
     if (seen >= DEFAULTS_VERSION) return false;
-    for (const d of DEFAULT_NOTES) {
-      if (p.notes.some(n => n.links.some(l => d.links.includes(l)))) continue;
+    const apply = (n, d) => Object.assign(n, { lv: d.lv, text: d.text, links: [...d.links] });
+    DEFAULT_NOTES.forEach((d, i) => {
+      const old = OLD_DEFAULT_NOTES[i];
+      const stale = old && p.notes.find(n => n.lv === old.lv && n.text === old.text);
+      if (stale) { apply(stale, d); return; }
+      if (seen) return;                       // had the defaults before; edited or deleted since
+      if (p.notes.some(n => n.links.some(l => d.links.includes(l)))) return;
       const same = p.notes.find(n => !n.links.length && /sleeping bag/i.test(n.text) && /sleeping bag/i.test(d.text));
-      if (same) same.links = [...d.links];
+      if (same) apply(same, d);
       else p.notes.push({ id: uid(), ...d, links: [...d.links] });
-    }
+    });
     try { localStorage.setItem(DEFAULTS_KEY, String(DEFAULTS_VERSION)); } catch { /* storage unavailable */ }
     return true;
   }
@@ -464,8 +477,8 @@
       </div>`;
   }
 
-  // A quest we have data for opens on the Timeline; other quest IDs, web addresses and search
-  // terms open in a new tab.
+  // A quest we have data for opens on the Timeline; other quest IDs and web addresses open in a new
+  // tab; anything else is plain text.
   function linkHTML(link, lv) {
     if (/^\d+$/.test(link)) {
       const q = questById.get(+link);
@@ -478,7 +491,7 @@
       try { host = new URL(link).hostname.replace(/^www\./, ''); } catch { /* keep the raw link */ }
       return `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">${esc(host)} ↗</a>`;
     }
-    return `<a href="${WOWHEAD}search?q=${encodeURIComponent(link)}" target="_blank" rel="noopener" title="Search Wowhead">🔍 ${esc(link)}</a>`;
+    return `<span class="note-detail">${esc(link)}</span>`;
   }
   const noteLinkHTML = n => (n.links.length ? ` <span class="note-links">${n.links.map(l => linkHTML(l, n.lv)).join('<span class="dim"> · </span>')}</span>` : '');
 
@@ -493,7 +506,7 @@
             <form class="note-form" data-edit-note="${n.id}" novalidate>
               <input type="number" class="num" data-nf="lv" min="1" max="60" step="1" value="${n.lv}" aria-label="Level">
               <input type="text" data-nf="text" value="${esc(n.text)}" maxlength="200" aria-label="Note">
-              <input type="text" data-nf="link" value="${esc(n.links.join(', '))}" placeholder="Links, comma-separated (optional)" maxlength="2000" aria-label="Links, comma-separated: quest IDs, web addresses or Wowhead search terms">
+              <input type="text" data-nf="link" value="${esc(n.links.join(', '))}" placeholder="Links and details, comma-separated (optional)" maxlength="2000" aria-label="Links and details, comma-separated: quest IDs, web addresses or text">
               <span class="note-actions">
                 <button type="submit" class="wow-btn small">Save</button>
                 <button type="button" class="wow-btn small" data-cancel-note>Cancel</button>
