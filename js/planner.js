@@ -371,14 +371,29 @@
   const AMIN = 1, AMAX = 60;
   const pct = L => ((Math.max(AMIN, Math.min(AMAX, L)) - AMIN) / (AMAX - AMIN)) * 100;
 
-  function gridHTML() {
+  // ---------- Level filter ----------
+  // "Your level" is shared with the Timeline tab. Like there, the planner can hide or fade steps and
+  // notes outside your level (+1); those two settings are the planner's own, remembered per browser.
+  const VIEW_KEY = 'forever-planner-view';
+  const view = { near: false, fadeFar: false };
+  try {
+    const v = JSON.parse(localStorage.getItem(VIEW_KEY)) || {};
+    for (const k of Object.keys(view)) if (typeof v[k] === 'boolean') view[k] = v[k];
+  } catch { /* storage unavailable */ }
+  const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch { /* storage unavailable */ } };
+  const myLevel = () => T.getLevel?.() ?? 15;
+  const stepNear = (s, L) => s.from <= L + 1 && s.end >= L;
+  const noteNear = (n, L) => n.lv >= L && n.lv <= L + 1;
+
+  function gridHTML(L) {
     let h = '<div class="grid" aria-hidden="true">';
     for (const [a, b] of gaps()) h += `<i class="gap" style="left:${pct(a)}%;width:${pct(b) - pct(a)}%"></i>`;
-    for (let L = AMIN; L <= AMAX; L++) h += `<i class="gl${L % 5 === 0 ? ' major' : ''}" style="left:${pct(L)}%"></i>`;
+    for (let lv = AMIN; lv <= AMAX; lv++) h += `<i class="gl${lv % 5 === 0 ? ' major' : ''}" style="left:${pct(lv)}%"></i>`;
     h += '</div><div class="grid top" aria-hidden="true">';
     for (const n of plan.notes) {
       if (n.lv >= AMIN && n.lv <= AMAX) h += `<i class="note-line" style="left:${pct(n.lv)}%"></i>`;
     }
+    h += `<i class="you" style="left:${pct(L)}%"></i>`;
     return h + '</div>';
   }
 
@@ -418,7 +433,7 @@
       <span class="ph r" style="${g.hr}" data-drag="end" title="Drag to change the end level"></span>`;
   }
 
-  function stepRow(s, i, notesHere) {
+  function stepRow(s, i, notesHere, far) {
     const w = warnings(s);
     const isOpen = open.has(s.id);
     const worst = w.find(v => v[0] === 'bad') || w[0];
@@ -429,7 +444,7 @@
       : '';
     const name = esc(stepName(s));
     return `
-      <div class="row pstep ${s.t}${isOpen ? ' open' : ''}" data-sid="${s.id}">
+      <div class="row pstep ${s.t}${isOpen ? ' open' : ''}${far ? ' far' : ''}" data-sid="${s.id}">
         <div class="label">
           <span class="pnum">${i + 1}</span>
           <button type="button" class="pname" data-pstep="${s.id}" aria-expanded="${isOpen}">${name}</button>
@@ -564,12 +579,14 @@
   // Wowhead's Forever data doesn't have everything yet, so a lookup falls back to Classic, and the
   // link then points at the Classic page.
   const WH_ENVS = [{ env: 16, path: 'forever' }, { env: 4, path: 'classic' }];
-  function whLinkHTML(kind, id) {
+  // `fallback` is a name we already know (a dungeon quest from our own data) to show until Wowhead's arrives.
+  function whLinkHTML(kind, id, fallback) {
     const key = `${kind}:${id}`;
     const known = whNames[key];
     const cls = known?.quality != null ? ` class="${QUALITY[known.quality] || ''}"` : '';
     const href = `https://www.wowhead.com/${known?.path || 'forever'}/${kind}=${id}`;
-    return `<a href="${href}" target="_blank" rel="noopener" data-wh="${key}"${cls}>${esc(known?.name || `${kind === 'item' ? 'Item' : 'Quest'} ${id}`)}</a>`;
+    const label = known?.name || fallback || `${kind === 'item' ? 'Item' : 'Quest'} ${id}`;
+    return `<a href="${href}" target="_blank" rel="noopener" data-wh="${key}"${cls}>${esc(label)}</a>`;
   }
   async function lookupWowhead(kind, id) {
     for (const { env, path } of WH_ENVS) {
@@ -580,24 +597,26 @@
     }
     return null;
   }
+  // An ID Wowhead doesn't know is remembered as { missing: time } and not looked up again for a week.
+  const RETRY_MISSING = 7 * 24 * 3600 * 1000;
   function fillWowheadNames() {
     document.querySelectorAll('#planner [data-wh]').forEach(a => {
       const key = a.dataset.wh;
-      if (whNames[key] || whTried.has(key)) return;
+      const known = whNames[key];
+      if (known?.name || (known?.missing && Date.now() - known.missing < RETRY_MISSING) || whTried.has(key)) return;
       whTried.add(key);
       const [kind, id] = key.split(':');
       lookupWowhead(kind, id)
         .then(found => {
-          if (!found) return;
-          whNames[key] = found;
+          whNames[key] = found || { missing: Date.now() };
           try { localStorage.setItem(NAMES_KEY, JSON.stringify(whNames)); } catch { /* storage unavailable */ }
-          document.querySelectorAll(`#planner [data-wh="${key}"]`).forEach(el => { el.outerHTML = whLinkHTML(kind, id); });
+          if (found) document.querySelectorAll(`#planner [data-wh="${key}"]`).forEach(el => { el.outerHTML = whLinkHTML(kind, id); });
         })
-        .catch(() => { /* offline or blocked: keep the ID label */ });
+        .catch(() => { /* offline or blocked: keep the ID label and try again next visit */ });
     });
   }
 
-  // A quest we have data for opens on the Timeline; other quests, items and the video open in a new tab.
+  // Quests and items link to Wowhead, and the video to YouTube, all in a new tab.
   const fmtTime = t => {
     const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = String(t % 60).padStart(2, '0');
     return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
@@ -605,12 +624,7 @@
   const videoURL = n => `https://www.youtube.com/watch?v=${encodeURIComponent(n.video)}${n.t ? `&t=${n.t}s` : ''}`;
   function noteLinkHTML(n) {
     const out = [];
-    if (n.quest) {
-      const q = questById.get(+n.quest);
-      out.push(q
-        ? `<a href="#" class="d-${diffAt(q, n.lv)}" data-goto="${q.id}" data-tip="q:${q.idx}">${esc(q.name)}</a>`
-        : whLinkHTML('quest', n.quest));
-    }
+    if (n.quest) out.push(whLinkHTML('quest', n.quest, questById.get(+n.quest)?.name));
     for (const i of n.items) out.push(whLinkHTML('item', i));
     if (n.video) out.push(`<a href="${videoURL(n)}" target="_blank" rel="noopener noreferrer" class="note-video">▶ Video${n.t ? ` ${fmtTime(n.t)}` : ''}</a>`);
     return out.length ? ` <span class="note-links">${out.join('<span class="dim"> · </span>')}</span>` : '';
@@ -631,7 +645,12 @@
   let editingNote = null;          // id of the note being edited in place
 
   function renderNotes() {
-    const list = [...plan.notes].sort((a, b) => a.lv - b.lv);
+    const L = myLevel();
+    const all = [...plan.notes].sort((a, b) => a.lv - b.lv);
+    const list = view.near ? all.filter(n => n.id === editingNote || noteNear(n, L)) : all;
+    const empty = all.length
+      ? `<li class="dim">No notes at level ${L} or ${L + 1}. Untick “Only show my level (+1)” to see all ${all.length}.</li>`
+      : '<li class="dim">No notes yet. Pin a reminder to a level, like a quest chain to start or a class trainer visit.</li>';
     $('#p-notes').innerHTML = list.length ? list.map(n => {
       if (n.id === editingNote) {
         return `
@@ -648,7 +667,7 @@
       }
       const owners = noteOwners(n);
       return `
-        <li>
+        <li${view.fadeFar && !noteNear(n, L) ? ' class="far"' : ''}>
           <span class="note-lv">${n.lv}</span>
           <div class="note-body">
             <div>${esc(n.text)}${noteLinkHTML(n)}</div>
@@ -657,7 +676,7 @@
           <button type="button" class="wow-btn small" data-edit="${n.id}">Edit</button>
           <button type="button" class="close-x" data-del-note="${n.id}" aria-label="Remove note">✕</button>
         </li>`;
-    }).join('') : '<li class="dim">No notes yet. Pin a reminder to a level, like a quest chain to start or a class trainer visit.</li>';
+    }).join('') : empty;
     fillWowheadNames();          // also covers note links in open step details, rendered just before
   }
 
@@ -765,15 +784,27 @@
     document.querySelectorAll('#p-faction button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.value === plan.faction)));
     $('#p-cls').value = plan.cls;
     $('#p-start').value = plan.start;
+    $('#p-level').value = myLevel();
+    $('#p-level-out').textContent = myLevel();
+    $('#p-near').checked = view.near;
+    $('#p-fade-far').checked = view.fadeFar;
   }
 
   function render() {
+    const L = myLevel();
     const notesFor = {};
     for (const n of plan.notes) for (const s of noteOwners(n)) (notesFor[s.id] ||= []).push(n);
-    const rows = plan.steps.map((s, i) => stepRow(s, i, (notesFor[s.id] || []).sort((a, b) => a.lv - b.lv)));
+    // Step numbers stay the same whether or not other steps are hidden.
+    const rows = plan.steps.map((s, i) => {
+      const near = stepNear(s, L);
+      if (view.near && !near && !open.has(s.id)) return '';
+      return stepRow(s, i, (notesFor[s.id] || []).sort((a, b) => a.lv - b.lv), view.fadeFar && !near);
+    }).filter(Boolean);
+    const empty = plan.steps.length
+      ? `<div class="no-results">Nothing in your route at level ${L} or ${L + 1}. Untick “Only show my level (+1)” to see all ${plan.steps.length} steps.</div>`
+      : '<div class="no-results">No steps yet. Add a zone, dungeon or custom step below, or load the example route.</div>';
     const y = scrollY;
-    $('#route-timeline').innerHTML = gridHTML() + axisHTML() + (rows.length ? rows.join('')
-      : '<div class="no-results">No steps yet. Add a zone, dungeon or custom step below, or load the example route.</div>');
+    $('#route-timeline').innerHTML = gridHTML(L) + axisHTML() + (rows.length ? rows.join('') : empty);
     scrollTo(0, y);
     renderSummary();
     renderNotes();
@@ -955,6 +986,26 @@
   });
   $('#p-cls').addEventListener('change', e => change(() => { plan.cls = e.target.value; }));
   $('#p-start').addEventListener('change', e => change(() => { plan.start = clampInt(e.target.value, 1, 59, plan.start); }));
+
+  // Level slider and filters (see "Level filter").
+  let levelRaf = 0;
+  $('#p-level').addEventListener('input', e => {
+    const L = clampInt(e.target.value, 1, 60, myLevel());
+    $('#p-level-out').textContent = L;
+    T.setLevel?.(L);
+    cancelAnimationFrame(levelRaf);
+    levelRaf = requestAnimationFrame(render);
+  });
+  $('#p-near').addEventListener('change', e => {
+    view.near = e.target.checked;
+    if (view.near) view.fadeFar = false;
+    saveView(); render();
+  });
+  $('#p-fade-far').addEventListener('change', e => {
+    view.fadeFar = e.target.checked;
+    if (view.fadeFar) view.near = false;
+    saveView(); render();
+  });
 
   $('#p-example').addEventListener('click', () => {
     if ((plan.steps.length || plan.notes.length) && !confirm('Replace your current route with the example?')) return;

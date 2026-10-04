@@ -153,7 +153,7 @@ main { display: grid; gap: 22px; }
 }
 .level-control { flex: 1 1 260px; }
 .level-row { display: flex; align-items: center; gap: 12px; }
-#level-out {
+#level-out, .level-out {
   min-width: 46px;
   padding: 2px 0;
   text-align: center;
@@ -497,6 +497,11 @@ select:focus, input:focus-visible, button:focus-visible {
 .row.far:focus-within .label > *, .row.far:focus-within .track .bar,
 .row.far.selected .label > *, .row.far.selected .track .bar,
 .row.far.open .label > *, .row.far.open .track .bar { opacity: .8; }
+/* Route planner: same fading for steps and notes */
+.row.pstep.far .pbar, .row.pstep.far .ph { opacity: .28; }
+.row.pstep.far:hover .pbar, .row.pstep.far.open .pbar, .row.pstep.far.dragging .pbar { opacity: .8; }
+.note-list li.far > * { opacity: .35; }
+.note-list li.far:hover > *, .note-list li.far:focus-within > * { opacity: .85; }
 .row.d.selected .label .name { color: var(--gold); }
 .row.d.selected .bar.dungeon { outline: 2px solid var(--gold); outline-offset: 1px; }
 

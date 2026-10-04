@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20">
+  <link rel="stylesheet" href="css/style.css?v=21">
 </head>
 <body>
   <header class="banner">
@@ -118,6 +118,19 @@
     </section>
 
     <section class="frame controls" aria-label="Route settings" data-view="planner" hidden>
+      <div class="control level-control">
+        <label for="p-level">Your level</label>
+        <div class="level-row">
+          <input type="range" id="p-level" min="1" max="60" value="15">
+          <output id="p-level-out" class="level-out" for="p-level">15</output>
+        </div>
+      </div>
+
+      <div class="control checks">
+        <label class="check"><input type="checkbox" id="p-near"> <span>Only show my level (+1)</span></label>
+        <label class="check" title="Fade steps and notes outside your level (+1) instead of hiding them"><input type="checkbox" id="p-fade-far"> <span>Highlight in-range</span></label>
+      </div>
+
       <div class="control">
         <span class="control-label" id="p-faction-label">Faction</span>
         <div class="seg" role="radiogroup" aria-labelledby="p-faction-label" id="p-faction">
@@ -227,12 +240,12 @@
     </form>
   </dialog>
 
-  <script src="data/dungeons.js?v=20"></script>
-  <script src="data/quests.js?v=20"></script>
-  <script src="data/journal.js?v=20"></script>
-  <script src="data/zones.js?v=20"></script>
-  <script src="js/app.js?v=20"></script>
-  <script src="js/planner.js?v=20"></script>
+  <script src="data/dungeons.js?v=21"></script>
+  <script src="data/quests.js?v=21"></script>
+  <script src="data/journal.js?v=21"></script>
+  <script src="data/zones.js?v=21"></script>
+  <script src="js/app.js?v=21"></script>
+  <script src="js/planner.js?v=21"></script>
   <script>const whTooltips = { colorLinks: false, iconizeLinks: false, renameLinks: false };</script>
   <script src="https://wow.zamimg.com/js/tooltips.js" async></script>
 </body>

@@ -51,10 +51,13 @@ step itself to move it. A step whose min and max are the same is a single point.
 - **Custom steps** are anything else, with your own name.
 - **Warnings**: flags under-leveled dungeons, quests still red or already grey when you get
   there, zones you'll outlevel, and levels nothing in the route covers (shaded).
+- **Your level**: the same level as the Timeline tab, marked on the planner's axis. *Only show my
+  level (+1)* hides steps and notes outside it, and *Highlight in-range* fades them instead.
 - **Level notes**: reminders pinned to a level, like "at 14, the sleeping bag chain begins".
   They stay at that level when steps move. Each note can also have a **quest**, **items**
   (comma-separated) and a YouTube **video**; each takes an ID or a full link, and a video can
-  include a start time (`pGR_66uhwSY?t=465`). **Edit** changes any of them.
+  include a start time (`pGR_66uhwSY?t=465`). Quest and item links go to Wowhead. **Edit**
+  changes any of them.
 - **Default notes**: every planner starts with 17 notes for worthwhile questlines from level 2
   to 56 (Bag of Marbles, the sleeping bag, Linken's Boomerang, the LBRS/UBRS trinkets and more).
   They live in `DEFAULT_NOTES` in `js/planner.js`. To add one, give it `since` set to the next
@@ -92,7 +95,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=20`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=21`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally

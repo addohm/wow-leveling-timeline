@@ -234,7 +234,7 @@
 
   function placeYou() {
     const x = pct(state.level) + 50 / CELLS;
-    document.querySelectorAll('.grid .you').forEach(el => {
+    document.querySelectorAll('.timeline:not(#route-timeline) .grid .you').forEach(el => {   // the planner places its own
       el.style.left = `${x}%`;
       el.hidden = state.level < LMIN;
     });
@@ -789,7 +789,7 @@
   function syncControls() {
     levelInput.value = state.level;
     levelOut.textContent = state.level;
-    document.querySelectorAll('.seg').forEach(seg => {
+    document.querySelectorAll('.seg[data-key]').forEach(seg => {
       seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.value === state[seg.dataset.key])));
     });
     $('#share').checked = state.share;
@@ -813,7 +813,7 @@
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => { renderAll(); save(); });
   });
-  document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => {
+  document.querySelectorAll('.seg[data-key]').forEach(seg => seg.addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b) return;
     state[seg.dataset.key] = b.dataset.value;
@@ -852,5 +852,8 @@
   window.ForeverTimeline = {
     DUNGEONS, QUESTS, questById, byKey, done, ZONES,
     diffAt, questLocation, locHTML, chainFor, chainProgress, esc, toast, hideTip, renderAll,
+    // The planner shares "your level"; the Timeline re-renders when its tab is shown again.
+    getLevel: () => state.level,
+    setLevel(L) { state.level = L; syncControls(); save(); },
   };
 })();
