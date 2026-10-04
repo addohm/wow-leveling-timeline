@@ -237,15 +237,9 @@
   }
 
   // ---------- Rendering ----------
-  let AMIN = 1, AMAX = 30;
+  // The axis always covers every level, 1–60.
+  const AMIN = 1, AMAX = 60;
   const pct = L => ((Math.max(AMIN, Math.min(AMAX, L)) - AMIN) / (AMAX - AMIN)) * 100;
-
-  function axisRange() {
-    const top = Math.max(routeEnd(), ...plan.notes.map(n => n.lv));
-    const low = Math.min(plan.start, ...plan.steps.map(s => s.from));
-    AMIN = Math.max(1, Math.floor((low - 1) / 5) * 5) || 1;
-    AMAX = Math.min(60, Math.max(AMIN + 20, Math.ceil((top + 4) / 5) * 5));
-  }
 
   function gridHTML() {
     let h = '<div class="grid" aria-hidden="true">';
@@ -582,7 +576,6 @@
   }
 
   function render() {
-    axisRange();
     const notesFor = {};
     for (const n of plan.notes) for (const s of noteOwners(n)) (notesFor[s.id] ||= []).push(n);
     const rows = plan.steps.map((s, i) => stepRow(s, i, (notesFor[s.id] || []).sort((a, b) => a.lv - b.lv)));

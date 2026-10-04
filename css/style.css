@@ -911,7 +911,7 @@ input.num { width: 72px; }
 .note-ico { flex: none; color: var(--note); font-size: 14px; cursor: help; }
 .planner-help { margin: 0 0 10px; }
 
-#route-timeline { --label-w: 410px; --track-min: 480px; }
+#route-timeline { --label-w: 410px; --track-min: 720px; }
 #route-timeline .row.axis { min-height: 40px; }
 #route-timeline .tick:not(.minor) { top: 64%; }
 .note-flag {
@@ -1100,7 +1100,7 @@ footer.frame { margin-top: 26px; margin-bottom: 36px; }
   .checks { padding-bottom: 0; }
   input[type=search] { width: 100%; }
   .control { flex: 1 1 100%; }
-  #route-timeline { --label-w: 230px; --track-min: 360px; }
+  #route-timeline { --label-w: 230px; --track-min: 540px; }
   .pnum, .row.pstep .new-tag, .row.pstep .prep-badge { display: none; }
   input.num.plv { width: 42px; }
   .note-form { grid-template-columns: 70px minmax(0, 1fr); }
