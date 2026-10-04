@@ -865,30 +865,39 @@ ol.route p { margin: 2px 0; font-size: 14px; }
 
 /* ---------- Tabs ---------- */
 [data-view][hidden] { display: none !important; }
+/* Folder tabs sitting on the panel below. The bar overlaps the panel's top edge
+   (1px black outline + 3px gold border); inactive tabs stop at that edge, and the
+   active tab runs over it into the panel's colour so the two read as one piece. */
 .tabs {
+  position: relative;
+  z-index: 2;
   display: flex;
+  align-items: flex-end;
   justify-content: center;
   gap: 6px;
   max-width: 1400px;
-  margin: 0 auto 18px;
+  margin: 0 auto -4px;
   padding: 0 16px;
 }
 .tabs button {
+  margin-bottom: 4px;
   font: 700 15px/1 "Cinzel", serif;
   letter-spacing: .06em;
   color: var(--gold-dim);
   background: linear-gradient(180deg, #2a2014, #15110d);
   border: 2px solid var(--gold-edge);
-  border-bottom-color: #000;
+  border-bottom: 0;
   border-radius: 6px 6px 0 0;
   padding: 10px 22px;
   cursor: pointer;
-  box-shadow: 0 0 0 1px #000;
+  box-shadow: 0 -1px 0 1px #000;
 }
 .tabs button:hover { color: #fff3a8; }
 .tabs button[aria-selected=true] {
+  margin-bottom: 0;
+  padding-bottom: 14px;
   color: var(--gold);
-  background: linear-gradient(180deg, #4a3618, #1d1712);
+  background: linear-gradient(180deg, #4a3618, #1b1712);
   border-color: #e0b84c;
   text-shadow: 0 1px 0 #000;
 }
