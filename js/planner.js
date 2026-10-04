@@ -39,18 +39,26 @@
     ],
   };
 
-  // Notes every planner starts with. They're added once per browser (tracked by DEFAULTS_KEY), so
-  // deleting one keeps it gone. To change the defaults, edit DEFAULT_NOTES, move the old wording to
-  // OLD_DEFAULT_NOTES (so untouched copies get updated), and bump DEFAULTS_VERSION.
-  const DEFAULT_NOTES = [{
-    lv: 14,
-    text: 'Sleeping bag chain begins for exp boost and bag',
-    links: ['79008', 'https://www.youtube.com/watch?v=tILWPzAyqLQ', '3% exp buff and 12 slot bag'],
-  }];
-  const OLD_DEFAULT_NOTES = [{ lv: 13, text: 'Start the sleeping bag chain' }];
+  // Notes every planner starts with. A browser gets each default once (DEFAULTS_KEY records the
+  // version it has seen), so deleting one keeps it gone.
+  // - To add a default, give it `since` = the new DEFAULTS_VERSION and bump DEFAULTS_VERSION.
+  // - To reword one, add its old { lv, text } to `was` and bump DEFAULTS_VERSION: untouched copies
+  //   update, edited ones are left alone.
+  const DEFAULT_NOTES = [
+    { since: 3, lv: 2, text: 'Bag of Marbles Questline Start', quest: '47', items: ['1191'], video: 'pGR_66uhwSY', t: 334 },
+    {
+      since: 1, lv: 14, text: 'Sleeping bag chain begins for exp boost and bag (3% exp buff and 12 slot bag)',
+      quest: '79008', items: [], video: 'tILWPzAyqLQ', t: 0,
+      was: [{ lv: 13, text: 'Start the sleeping bag chain' }, { lv: 14, text: 'Sleeping bag chain begins for exp boost and bag' }],
+    },
+    { since: 3, lv: 20, text: 'Light of Elune Questline Start', quest: '1016', items: ['5816'], video: 'pGR_66uhwSY', t: 465 },
+    { since: 3, lv: 30, text: 'Skull of Impending Doom Questline Start', quest: '727', items: ['4984'], video: 'pGR_66uhwSY', t: 0 },
+    { since: 3, lv: 35, text: 'Nifty Stopwatch Questline Start', quest: '734', items: ['2820'], video: 'pGR_66uhwSY', t: 235 },
+  ];
   const DEFAULTS_KEY = 'forever-planner-defaults';
-  const DEFAULTS_VERSION = 2;
-  EXAMPLE.notes = DEFAULT_NOTES;
+  const DEFAULTS_VERSION = 3;
+  const noteFields = d => ({ lv: d.lv, text: d.text, quest: d.quest, items: [...d.items], video: d.video, t: d.t });
+  EXAMPLE.notes = DEFAULT_NOTES.map(noteFields);
 
   const $ = sel => document.querySelector(sel);
   const clampInt = (v, lo, hi, dflt) => {
@@ -65,8 +73,8 @@
   // or { t: 'custom', name, from, end }.
   // A step with from === end is a single point on the axis (a dungeon run that doesn't take a whole level).
   // Steps are kept sorted by level and may overlap, e.g. a dungeon run in the middle of a zone.
-  // Notes: { lv, text, links: [] } pinned to a level; each link is a Wowhead quest ID, a web address,
-  // or plain text shown as is.
+  // Notes: { lv, text, quest, items: [], video, t } pinned to a level: a Wowhead quest ID, Wowhead
+  // item IDs, and a YouTube video ID with an optional start time in seconds.
   function clean(p) {
     const out = {
       faction: p?.faction === 'H' ? 'H' : 'A',
@@ -93,56 +101,103 @@
       chain = end;
     }
     for (const n of Array.isArray(p?.notes) ? p.notes : []) {
-      const text = String(n?.text ?? '').trim().slice(0, 200);
-      if (!text) continue;
-      // Older notes had a single `quest` or `url` instead of `links`.
-      const raw = [...(Array.isArray(n.links) ? n.links : []), n.quest, n.url];
-      const links = [...new Set(raw.map(l => parseLink(l).link).filter(Boolean))].slice(0, MAX_LINKS);
-      out.notes.push({ id: uid(), lv: clampInt(n.lv, 1, 60, 1), text, links });
+      const note = cleanNote(n);
+      if (note) out.notes.push(note);
     }
     sortSteps(out);
     return out;
   }
 
-  // One entry from a note's links: a Wowhead quest ID, an http(s) address (https:// is optional), or
-  // anything else as plain text. Returns { link } with the normalised entry, {} when empty, or { error }.
-  const MAX_LINKS = 10;
-  function parseLink(raw) {
-    const s = String(raw ?? '').trim();
-    if (!s) return {};
-    if (/^\d{1,7}$/.test(s)) return { link: s };
-    if (/^(?:javascript|data|vbscript|file):/i.test(s)) return { error: `“${s.slice(0, 40)}” isn’t a web address starting with http:// or https://.` };
-    const scheme = /^https?:\/\//i.test(s);
-    if (scheme || /^[^\s/:]+\.[a-z]{2,}(?:[/?#:]|$)/i.test(s)) {
-      try {
-        const u = new URL(scheme ? s : `https://${s}`);
-        if (u.hostname.includes('.') && u.href.length <= 500) return { link: u.href };
-      } catch { /* not a URL */ }
-      return { error: `“${s.slice(0, 40)}” isn’t a valid web address.` };
+  // A saved or shared note, including older shapes: a single `quest`/`url`, or a `links` list mixing
+  // quest IDs, web addresses and plain text. Unrecognised entries are kept by adding them to the text.
+  function cleanNote(n) {
+    let text = String(n?.text ?? '').trim();
+    if (!text) return null;
+    const v = parseVideo(n.video ? `${n.video}${n.t ? `?t=${n.t}` : ''}` : '');
+    const note = { id: uid(), lv: clampInt(n.lv, 1, 60, 1), quest: parseQuest(n.quest).quest || '', items: [], video: v.video || '', t: v.t || 0 };
+    for (const i of Array.isArray(n.items) ? n.items : []) {
+      const id = parseItem(i).item;
+      if (id && !note.items.includes(id)) note.items.push(id);
     }
-    return { link: s.slice(0, 120) };
-  }
-  // A comma-separated list of links, like "79008, https://youtube.com/…, linkens boomerang".
-  function parseLinks(raw) {
-    const links = [];
-    for (const part of String(raw ?? '').split(',')) {
-      const r = parseLink(part);
-      if (r.error) return r;
-      if (r.link && !links.includes(r.link)) links.push(r.link);
+    const extra = [];
+    for (const raw of [...(Array.isArray(n.links) ? n.links : []), n.url]) {
+      const s = String(raw ?? '').trim();
+      if (!s) continue;
+      const q = parseQuest(s), it = parseItem(s), vid = /^https?:/i.test(s) ? parseVideo(s) : {};
+      if (q.quest && !note.quest) note.quest = q.quest;
+      else if (it.item) { if (!note.items.includes(it.item)) note.items.push(it.item); }
+      else if (vid.video && !note.video) Object.assign(note, { video: vid.video, t: vid.t });
+      else if (!q.quest) extra.push(s);
     }
-    if (links.length > MAX_LINKS) return { error: `A note can have up to ${MAX_LINKS} links.` };
-    return { links };
+    if (extra.length) text += ` (${extra.join(', ')})`;
+    note.text = text.slice(0, MAX_TEXT);
+    note.items = note.items.slice(0, MAX_ITEMS);
+    return note;
   }
 
-  // Validates note fields; returns the note's values or { error }.
-  function readNote(lvRaw, textRaw, linksRaw) {
-    const lv = Math.round(Number(String(lvRaw).trim()));
-    const text = String(textRaw).trim();
-    if (!String(lvRaw).trim() || !(lv >= 1 && lv <= 60)) return { error: 'Enter a level from 1 to 60.' };
+  // Note fields. Each takes a bare ID or a full link and returns the ID, {} when empty, or { error }.
+  const MAX_TEXT = 300, MAX_ITEMS = 10;
+  const wowheadId = (s, kind) => s.match(new RegExp(`wowhead\\.com/(?:[\\w-]+/)*${kind}=(\\d+)`, 'i'))?.[1];
+
+  function parseQuest(raw) {
+    const s = String(raw ?? '').trim();
+    if (!s) return {};
+    const id = /^\d{1,7}$/.test(s) ? s : wowheadId(s, 'quest');
+    return id ? { quest: id } : { error: `Enter a quest ID like 727, or its Wowhead link.` };
+  }
+  function parseItem(raw) {
+    const s = String(raw ?? '').trim();
+    if (!s) return {};
+    const id = /^\d{1,7}$/.test(s) ? s : wowheadId(s, 'item');
+    return id ? { item: id } : { error: `“${s.slice(0, 40)}” isn’t an item ID like 4984, or a Wowhead item link.` };
+  }
+  function parseItems(raw) {
+    const items = [];
+    for (const part of String(raw ?? '').split(',')) {
+      const r = parseItem(part);
+      if (r.error) return r;
+      if (r.item && !items.includes(r.item)) items.push(r.item);
+    }
+    return items.length > MAX_ITEMS ? { error: `A note can have up to ${MAX_ITEMS} items.` } : { items };
+  }
+
+  // A YouTube video: the 11-character ID, optionally with a time (pGR_66uhwSY?t=465), or a
+  // youtube.com / youtu.be link. Times can be seconds (465, 465s) or 7m45s / 1h2m3s.
+  function parseVideo(raw) {
+    const s = String(raw ?? '').trim();
+    if (!s) return {};
+    let id, time;
+    const bare = s.match(/^([\w-]{11})(?:[?&#]?t=(\S+))?$/);
+    if (bare) [, id, time] = bare;
+    else {
+      try {
+        const u = new URL(/^https?:\/\//i.test(s) ? s : `https://${s}`);
+        const host = u.hostname.replace(/^(www|m)\./, '');
+        if (host === 'youtu.be') id = u.pathname.slice(1);
+        else if (host === 'youtube.com') id = u.searchParams.get('v') || u.pathname.match(/^\/(?:shorts|embed|live)\/([\w-]{11})/)?.[1];
+        time = u.searchParams.get('t') || u.searchParams.get('start');
+      } catch { /* not a link */ }
+    }
+    if (!id || !/^[\w-]{11}$/.test(id)) return { error: 'Enter a YouTube video ID like pGR_66uhwSY, or a YouTube link.' };
+    const m = String(time ?? '').match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);
+    const t = m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0;
+    return { video: id, t };
+  }
+
+  // Validates the note form; returns the note's values or { error }.
+  function readNote(f) {
+    const lvRaw = String(f.lv).trim();
+    const lv = Math.round(Number(lvRaw));
+    const text = String(f.text).trim();
+    if (!lvRaw || !(lv >= 1 && lv <= 60)) return { error: 'Enter a level from 1 to 60.' };
     if (!text) return { error: 'Enter the note text.' };
-    const r = parseLinks(linksRaw);
-    if (r.error) return r;
-    return { lv, text: text.slice(0, 200), links: r.links };
+    const q = parseQuest(f.quest);
+    if (q.error) return q;
+    const it = parseItems(f.items);
+    if (it.error) return it;
+    const v = parseVideo(f.video);
+    if (v.error) return v;
+    return { lv, text: text.slice(0, MAX_TEXT), quest: q.quest || '', items: it.items, video: v.video || '', t: v.t || 0 };
   }
 
   // Level order; a zone or longer run comes before a point that starts at the same level.
@@ -161,7 +216,11 @@
         if (!s.wing) delete s.wing;
         return s;
       }),
-      notes: p.notes.map(n => ({ lv: n.lv, text: n.text, ...(n.links.length && { links: n.links }) })),
+      notes: p.notes.map(n => ({
+        lv: n.lv, text: n.text,
+        ...(n.quest && { quest: n.quest }), ...(n.items.length && { items: n.items }),
+        ...(n.video && { video: n.video }), ...(n.video && n.t && { t: n.t }),
+      })),
     };
   }
 
@@ -174,24 +233,20 @@
     catch { /* storage unavailable */ }
   }
 
-  // An untouched copy of an older default is updated to the new wording. A browser that has never had
-  // the defaults gets them added, unless a note about the same thing (same link, or an unlinked
-  // sleeping bag note) is already there, which gets the default's details instead.
+  // Brings a browser's notes up to the current defaults: an untouched copy of an older wording is
+  // updated, and a default newer than the browser has seen is added unless a note for the same quest
+  // is already there. Defaults the browser already had and the user edited or deleted are left alone.
   function addDefaultNotes(p) {
     let seen = 0;
     try { seen = Number(localStorage.getItem(DEFAULTS_KEY)) || 0; } catch { /* storage unavailable */ }
     if (seen >= DEFAULTS_VERSION) return false;
-    const apply = (n, d) => Object.assign(n, { lv: d.lv, text: d.text, links: [...d.links] });
-    DEFAULT_NOTES.forEach((d, i) => {
-      const old = OLD_DEFAULT_NOTES[i];
-      const stale = old && p.notes.find(n => n.lv === old.lv && n.text === old.text);
-      if (stale) { apply(stale, d); return; }
-      if (seen) return;                       // had the defaults before; edited or deleted since
-      if (p.notes.some(n => n.links.some(l => d.links.includes(l)))) return;
-      const same = p.notes.find(n => !n.links.length && /sleeping bag/i.test(n.text) && /sleeping bag/i.test(d.text));
-      if (same) apply(same, d);
-      else p.notes.push({ id: uid(), ...d, links: [...d.links] });
-    });
+    for (const d of DEFAULT_NOTES) {
+      const stale = p.notes.find(n => (d.was || []).some(w => n.lv === w.lv && n.text === w.text));
+      if (stale) { Object.assign(stale, noteFields(d)); continue; }
+      if (d.since <= seen) continue;
+      if (p.notes.some(n => n.quest && n.quest === d.quest)) continue;
+      p.notes.push({ id: uid(), ...noteFields(d) });
+    }
     try { localStorage.setItem(DEFAULTS_KEY, String(DEFAULTS_VERSION)); } catch { /* storage unavailable */ }
     return true;
   }
@@ -477,23 +532,69 @@
       </div>`;
   }
 
-  // A quest we have data for opens on the Timeline; other quest IDs and web addresses open in a new
-  // tab; anything else is plain text.
-  function linkHTML(link, lv) {
-    if (/^\d+$/.test(link)) {
-      const q = questById.get(+link);
-      return q
-        ? `<a href="#" class="d-${diffAt(q, lv)}" data-goto="${q.id}" data-tip="q:${q.idx}">${esc(q.name)}</a>`
-        : `<a href="${WOWHEAD}quest=${esc(link)}" target="_blank" rel="noopener">Quest ${esc(link)} on Wowhead ↗</a>`;
-    }
-    if (/^https?:\/\//.test(link)) {
-      let host = link;
-      try { host = new URL(link).hostname.replace(/^www\./, ''); } catch { /* keep the raw link */ }
-      return `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">${esc(host)} ↗</a>`;
-    }
-    return `<span class="note-detail">${esc(link)}</span>`;
+  // ---------- Wowhead names ----------
+  // Quest and item names come from Wowhead's tooltip data and are cached in the browser, so each is
+  // fetched once. Until a name arrives (or if the lookup fails) the link shows "Quest 727" / "Item 4984".
+  const NAMES_KEY = 'forever-wowhead-names';
+  const QUALITY = ['q-poor', 'q-common', 'q-uncommon', 'q-rare', 'q-epic', 'q-legendary'];
+  let whNames = {};
+  try { whNames = JSON.parse(localStorage.getItem(NAMES_KEY)) || {}; } catch { /* storage unavailable */ }
+  const whTried = new Set();     // lookups started this session, so a failure isn't retried every render
+
+  function whLinkHTML(kind, id) {
+    const key = `${kind}:${id}`;
+    const known = whNames[key];
+    const cls = known?.quality != null ? ` class="${QUALITY[known.quality] || ''}"` : '';
+    return `<a href="${WOWHEAD}${kind}=${id}" target="_blank" rel="noopener" data-wh="${key}"${cls}>${esc(known?.name || `${kind === 'item' ? 'Item' : 'Quest'} ${id}`)}</a>`;
   }
-  const noteLinkHTML = n => (n.links.length ? ` <span class="note-links">${n.links.map(l => linkHTML(l, n.lv)).join('<span class="dim"> · </span>')}</span>` : '');
+  function fillWowheadNames() {
+    document.querySelectorAll('#planner [data-wh]').forEach(a => {
+      const key = a.dataset.wh;
+      if (whNames[key] || whTried.has(key)) return;
+      whTried.add(key);
+      const [kind, id] = key.split(':');
+      fetch(`https://nether.wowhead.com/tooltip/${kind}/${id}?dataEnv=16&locale=0`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(j => {
+          if (!j?.name) return;
+          whNames[key] = { name: String(j.name).slice(0, 120), ...(kind === 'item' && Number.isInteger(j.quality) && { quality: j.quality }) };
+          try { localStorage.setItem(NAMES_KEY, JSON.stringify(whNames)); } catch { /* storage unavailable */ }
+          document.querySelectorAll(`#planner [data-wh="${key}"]`).forEach(el => { el.outerHTML = whLinkHTML(kind, id); });
+        })
+        .catch(() => { /* offline or blocked: keep the ID label */ });
+    });
+  }
+
+  // A quest we have data for opens on the Timeline; other quests, items and the video open in a new tab.
+  const fmtTime = t => {
+    const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = String(t % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+  };
+  const videoURL = n => `https://www.youtube.com/watch?v=${encodeURIComponent(n.video)}${n.t ? `&t=${n.t}s` : ''}`;
+  function noteLinkHTML(n) {
+    const out = [];
+    if (n.quest) {
+      const q = questById.get(+n.quest);
+      out.push(q
+        ? `<a href="#" class="d-${diffAt(q, n.lv)}" data-goto="${q.id}" data-tip="q:${q.idx}">${esc(q.name)}</a>`
+        : whLinkHTML('quest', n.quest));
+    }
+    for (const i of n.items) out.push(whLinkHTML('item', i));
+    if (n.video) out.push(`<a href="${videoURL(n)}" target="_blank" rel="noopener noreferrer" class="note-video">▶ Video${n.t ? ` ${fmtTime(n.t)}` : ''}</a>`);
+    return out.length ? ` <span class="note-links">${out.join('<span class="dim"> · </span>')}</span>` : '';
+  }
+
+  // The note form fields, shared by "Add note" and editing a note in place.
+  function noteFieldsHTML(n = {}) {
+    const video = n.video ? `${n.video}${n.t ? `?t=${n.t}` : ''}` : '';
+    return `
+      <input type="number" class="num" data-nf="lv" min="1" max="60" step="1" value="${n.lv ?? ''}" placeholder="Lvl" aria-label="Level">
+      <input type="text" data-nf="text" value="${esc(n.text ?? '')}" maxlength="${MAX_TEXT}" placeholder="Note" aria-label="Note">
+      <input type="text" data-nf="quest" value="${esc(n.quest ?? '')}" placeholder="Quest ID" aria-label="Quest: Wowhead quest ID or link">
+      <input type="text" data-nf="items" value="${esc((n.items || []).join(', '))}" placeholder="Item IDs" aria-label="Items: Wowhead item IDs or links, comma-separated">
+      <input type="text" data-nf="video" value="${esc(video)}" placeholder="YouTube ID or link" aria-label="Video: YouTube video ID or link">`;
+  }
+  const formValues = form => Object.fromEntries(['lv', 'text', 'quest', 'items', 'video'].map(k => [k, form.querySelector(`[data-nf="${k}"]`).value]));
 
   let editingNote = null;          // id of the note being edited in place
 
@@ -504,9 +605,7 @@
         return `
           <li class="note-editing">
             <form class="note-form" data-edit-note="${n.id}" novalidate>
-              <input type="number" class="num" data-nf="lv" min="1" max="60" step="1" value="${n.lv}" aria-label="Level">
-              <input type="text" data-nf="text" value="${esc(n.text)}" maxlength="200" aria-label="Note">
-              <input type="text" data-nf="link" value="${esc(n.links.join(', '))}" placeholder="Links and details, comma-separated (optional)" maxlength="2000" aria-label="Links and details, comma-separated: quest IDs, web addresses or text">
+              ${noteFieldsHTML(n)}
               <span class="note-actions">
                 <button type="submit" class="wow-btn small">Save</button>
                 <button type="button" class="wow-btn small" data-cancel-note>Cancel</button>
@@ -527,6 +626,7 @@
           <button type="button" class="close-x" data-del-note="${n.id}" aria-label="Remove note">✕</button>
         </li>`;
     }).join('') : '<li class="dim">No notes yet. Pin a reminder to a level, like a quest chain to start or a class trainer visit.</li>';
+    fillWowheadNames();          // also covers note links in open step details, rendered just before
   }
 
   function renderSummary() {
@@ -849,7 +949,7 @@
   $('#p-note-form').addEventListener('submit', e => {
     e.preventDefault();
     noteErr.textContent = '';
-    const n = readNote($('#p-note-lv').value, $('#p-note-text').value, $('#p-note-link').value);
+    const n = readNote(formValues($('#p-note-form')));
     if (n.error) { noteErr.textContent = n.error; return; }
     change(() => plan.notes.push({ id: uid(), ...n }));
     $('#p-note-form').reset();
@@ -865,8 +965,7 @@
     const form = e.target.closest('[data-edit-note]');
     if (!form) return;
     e.preventDefault();
-    const f = name => form.querySelector(`[data-nf="${name}"]`);
-    const n = readNote(f('lv').value, f('text').value, f('link').value);
+    const n = readNote(formValues(form));
     if (n.error) { form.parentElement.querySelector('[data-nf="err"]').textContent = n.error; return; }
     const note = plan.notes.find(x => x.id === form.dataset.editNote);
     editingNote = null;

@@ -1067,8 +1067,13 @@ ul.ref-quests li.skipped a { opacity: .45; text-decoration: line-through; }
 .note-help { margin: 2px 0 0; }
 .note-help code { color: var(--ink); font-size: 12px; }
 .note-links a { white-space: nowrap; }
-.note-detail { color: var(--ink-dim); font-style: italic; }
-.note-form { display: grid; grid-template-columns: 80px minmax(0, 2fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.note-form {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.6fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.note-video { color: #ff6b6b; }
 .form-err { min-height: 1.2em; margin: 4px 0 0; font-size: 14px; color: var(--d-red); }
 
 /* ---------- Footer ---------- */
@@ -1108,6 +1113,8 @@ footer.frame { margin-top: 26px; margin-bottom: 36px; }
   .pnum, .row.pstep .new-tag, .row.pstep .prep-badge { display: none; }
   input.num.plv { width: 42px; }
   .note-form { grid-template-columns: 70px minmax(0, 1fr); }
+  .note-form [data-nf="quest"], .note-form [data-nf="items"] { grid-column: span 1; }
+  .note-form [data-nf="video"], .note-form > .wow-btn, .note-form .note-actions { grid-column: 1 / -1; }
   .add-row select { flex: 1 1 100%; min-width: 0; }
   .add-label { width: auto; flex-basis: 100%; }
   .group-head .plan-btn .pl-text { display: none; }

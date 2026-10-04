@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=17">
+  <link rel="stylesheet" href="css/style.css?v=18">
 </head>
 <body>
   <header class="banner">
@@ -189,13 +189,15 @@
         <h3>Level notes</h3>
         <ul class="note-list" id="p-notes"></ul>
         <form class="note-form" id="p-note-form" novalidate>
-          <input type="number" id="p-note-lv" class="num" min="1" max="60" step="1" placeholder="13" aria-label="Level">
-          <input type="text" id="p-note-text" placeholder="Start the sleeping bag chain" aria-label="Note" maxlength="200">
-          <input type="text" id="p-note-link" placeholder="Links and details, comma-separated (optional)" aria-label="Links and details, comma-separated: quest IDs, web addresses or text" maxlength="2000" title="Quest IDs, web addresses or text, separated by commas. For example: 79008, https://youtube.com/…, 3% exp buff and 12 slot bag">
+          <input type="number" data-nf="lv" class="num" min="1" max="60" step="1" placeholder="Lvl" aria-label="Level">
+          <input type="text" data-nf="text" placeholder="Note" aria-label="Note" maxlength="300">
+          <input type="text" data-nf="quest" placeholder="Quest ID" aria-label="Quest: Wowhead quest ID or link">
+          <input type="text" data-nf="items" placeholder="Item IDs" aria-label="Items: Wowhead item IDs or links, comma-separated">
+          <input type="text" data-nf="video" placeholder="YouTube ID or link" aria-label="Video: YouTube video ID or link">
           <button type="submit" class="wow-btn small">Add note</button>
         </form>
         <p class="form-err" id="p-note-err" role="alert"></p>
-        <p class="dim small note-help">Separate links and details with commas. A number links to that quest, a web address becomes a link, and anything else shows as text. For example: <code>79008, https://youtube.com/…, 3% exp buff and 12 slot bag</code></p>
+        <p class="dim small note-help">Quest, items and video are optional. Each takes an ID or a full link: a quest like <code>727</code>, items like <code>4984, 2820</code>, and a video like <code>pGR_66uhwSY?t=465</code> (the time is optional).</p>
       </div>
     </section>
   </main>
@@ -225,12 +227,12 @@
     </form>
   </dialog>
 
-  <script src="data/dungeons.js?v=17"></script>
-  <script src="data/quests.js?v=17"></script>
-  <script src="data/journal.js?v=17"></script>
-  <script src="data/zones.js?v=17"></script>
-  <script src="js/app.js?v=17"></script>
-  <script src="js/planner.js?v=17"></script>
+  <script src="data/dungeons.js?v=18"></script>
+  <script src="data/quests.js?v=18"></script>
+  <script src="data/journal.js?v=18"></script>
+  <script src="data/zones.js?v=18"></script>
+  <script src="js/app.js?v=18"></script>
+  <script src="js/planner.js?v=18"></script>
   <script>const whTooltips = { colorLinks: false, iconizeLinks: false, renameLinks: false };</script>
   <script src="https://wow.zamimg.com/js/tooltips.js" async></script>
 </body>

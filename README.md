@@ -52,14 +52,14 @@ step itself to move it. A step whose min and max are the same is a single point.
 - **Warnings**: flags under-leveled dungeons, quests still red or already grey when you get
   there, zones you'll outlevel, and levels nothing in the route covers (shaded).
 - **Level notes**: reminders pinned to a level, like "at 14, the sleeping bag chain begins".
-  They stay at that level when steps move. A note can have links and details, separated by
-  commas: a number links to that Wowhead quest, a web address becomes a link, and anything else
-  shows as text (for example `79008, https://youtube.com/…, 3% exp buff and 12 slot bag`).
-  **Edit** changes a note's level, text or links.
-- **Default notes**: every planner starts with a note at 14 for the sleeping bag chain
-  ([quest 79008](https://www.wowhead.com/forever/quest=79008)). Defaults live in `DEFAULT_NOTES`
-  in `js/planner.js`; to change one, move its old wording to `OLD_DEFAULT_NOTES` and bump
-  `DEFAULTS_VERSION`, so untouched copies update and edited or deleted ones are left alone.
+  They stay at that level when steps move. Each note can also have a **quest**, **items**
+  (comma-separated) and a YouTube **video**; each takes an ID or a full link, and a video can
+  include a start time (`pGR_66uhwSY?t=465`). **Edit** changes any of them.
+- **Default notes**: every planner starts with notes for the Bag of Marbles (2), sleeping bag
+  (14), Light of Elune (20), Skull of Impending Doom (30) and Nifty Stopwatch (35) questlines.
+  They live in `DEFAULT_NOTES` in `js/planner.js`. To add one, give it `since` set to the next
+  `DEFAULTS_VERSION` and bump that; to reword one, add its old level and text to `was` and bump
+  it. Untouched copies update, and notes people edited or deleted are left alone.
 - **Share**: *Copy share link* puts the whole route in the URL. Routes are saved in your browser.
 
 ## Files
@@ -92,7 +92,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=17`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=18`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally
