@@ -55,11 +55,11 @@ step itself to move it. A step whose min and max are the same is a single point.
   They stay at that level when steps move. Each note can also have a **quest**, **items**
   (comma-separated) and a YouTube **video**; each takes an ID or a full link, and a video can
   include a start time (`pGR_66uhwSY?t=465`). **Edit** changes any of them.
-- **Default notes**: every planner starts with notes for the Bag of Marbles (2), sleeping bag
-  (14), Light of Elune (20), Skull of Impending Doom (30) and Nifty Stopwatch (35) questlines.
+- **Default notes**: every planner starts with 17 notes for worthwhile questlines from level 2
+  to 56 (Bag of Marbles, the sleeping bag, Linken's Boomerang, the LBRS/UBRS trinkets and more).
   They live in `DEFAULT_NOTES` in `js/planner.js`. To add one, give it `since` set to the next
-  `DEFAULTS_VERSION` and bump that; to reword one, add its old level and text to `was` and bump
-  it. Untouched copies update, and notes people edited or deleted are left alone.
+  `DEFAULTS_VERSION` and bump that; to change one, add its previous values to `was` and bump it.
+  Untouched copies update, and notes people edited or deleted are left alone.
 - **Share**: *Copy share link* puts the whole route in the URL. Routes are saved in your browser.
 
 ## Files
@@ -92,7 +92,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=18`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=20`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally

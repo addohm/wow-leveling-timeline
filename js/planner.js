@@ -42,21 +42,37 @@
   // Notes every planner starts with. A browser gets each default once (DEFAULTS_KEY records the
   // version it has seen), so deleting one keeps it gone.
   // - To add a default, give it `since` = the new DEFAULTS_VERSION and bump DEFAULTS_VERSION.
-  // - To reword one, add its old { lv, text } to `was` and bump DEFAULTS_VERSION: untouched copies
-  //   update, edited ones are left alone.
+  // - To change one, add its previous values to `was` and bump DEFAULTS_VERSION. A note matching
+  //   every field given in a `was` entry is an untouched copy and gets updated; edited ones are left alone.
+  const MARBLES = 'pGR_66uhwSY', GEAR = 'kh-Apd_qKGc';      // the two questline guide videos
+  const def = (since, lv, text, quest, items, video, t = 0, was) => ({ since, lv, text, quest, items, video, t, ...(was && { was }) });
   const DEFAULT_NOTES = [
-    { since: 3, lv: 2, text: 'Bag of Marbles Questline Start', quest: '47', items: ['1191'], video: 'pGR_66uhwSY', t: 334 },
-    {
-      since: 1, lv: 14, text: 'Sleeping bag chain begins for exp boost and bag (3% exp buff and 12 slot bag)',
-      quest: '79008', items: [], video: 'tILWPzAyqLQ', t: 0,
-      was: [{ lv: 13, text: 'Start the sleeping bag chain' }, { lv: 14, text: 'Sleeping bag chain begins for exp boost and bag' }],
-    },
-    { since: 3, lv: 20, text: 'Light of Elune Questline Start', quest: '1016', items: ['5816'], video: 'pGR_66uhwSY', t: 465 },
-    { since: 3, lv: 30, text: 'Skull of Impending Doom Questline Start', quest: '727', items: ['4984'], video: 'pGR_66uhwSY', t: 0 },
-    { since: 3, lv: 35, text: 'Nifty Stopwatch Questline Start', quest: '734', items: ['2820'], video: 'pGR_66uhwSY', t: 235 },
+    def(3, 2, 'Bag of Marbles Questline Start', '47', ['1191'], MARBLES, 328,
+      [{ lv: 2, text: 'Bag of Marbles Questline Start', quest: '47', items: ['1191'], video: MARBLES, t: 334 }]),
+    def(1, 14, 'Sleeping bag chain begins for exp boost and bag (3% exp buff and 12 slot bag)', '79008', ['211527', '1652'], 'tILWPzAyqLQ', 0, [
+      { lv: 13, text: 'Start the sleeping bag chain' },
+      { lv: 14, text: 'Sleeping bag chain begins for exp boost and bag' },
+      { lv: 14, text: 'Sleeping bag chain begins for exp boost and bag (3% exp buff and 12 slot bag)', quest: '79008', items: [], video: 'tILWPzAyqLQ', t: 0 },
+    ]),
+    def(3, 20, 'Light of Elune Questline Start', '1016', ['5816'], MARBLES, 465),
+    def(3, 30, 'Skull of Impending Doom Questline Start', '727', ['4984'], MARBLES, 87,
+      [{ lv: 30, text: 'Skull of Impending Doom Questline Start', quest: '727', items: ['4984'], video: MARBLES, t: 0 }]),
+    def(3, 35, 'Nifty Stopwatch Questline Start', '734', ['2820'], MARBLES, 235),
+    def(4, 44, 'Nogginfogger Elixir Questline Start', '2605', ['8529'], MARBLES, 566),
+    def(4, 46, 'Rune of the Guard Captain Questline Start', '179913', ['19120'], GEAR, 162),
+    def(4, 47, "Linken's Boomerang Questline Start", '3844', ['11902', '11904', '11905'], MARBLES, 694),
+    def(4, 50, 'Songstone of Ironforge Questline Start', '4363', ['12548', '12543'], GEAR, 280),
+    def(4, 51, 'Heartseeker Quest in Alterac Valley (PVP)', '8271', ['19107', '19106', '19108', '20648'], GEAR, 356),
+    def(4, 52, 'Barov Peasant Collar Questline Start', '5341', ['14023'], MARBLES, 827),
+    def(4, 52, 'Mark of Fordring Elite Escort Quest', '5944', ['15411', '15418', '15421', '16058', '15413'], GEAR, 221),
+    def(4, 52, 'Wyrmhide Spaulders Questline Start', '4022', ['12066', '12082', '12083'], GEAR, 256),
+    def(4, 54, 'Class specific Dire Maul trinket', '', [], GEAR, 425),
+    def(4, 55, 'LBRS Gear & Ony Attunement Questline Start', '5001', ['13962', '13958', '13959', '13961', '13963'], GEAR, 527),
+    def(4, 55, "Mirah's Song Questline Start", '5382', ['15806', '15805', '13544'], GEAR, 470),
+    def(4, 56, 'UBRS Trinket Questline Start', '5089', ['13965', '13968', '13966'], GEAR, 601),
   ];
   const DEFAULTS_KEY = 'forever-planner-defaults';
-  const DEFAULTS_VERSION = 3;
+  const DEFAULTS_VERSION = 4;
   const noteFields = d => ({ lv: d.lv, text: d.text, quest: d.quest, items: [...d.items], video: d.video, t: d.t });
   EXAMPLE.notes = DEFAULT_NOTES.map(noteFields);
 
@@ -233,18 +249,22 @@
     catch { /* storage unavailable */ }
   }
 
-  // Brings a browser's notes up to the current defaults: an untouched copy of an older wording is
+  // Brings a browser's notes up to the current defaults: an untouched copy of an older version is
   // updated, and a default newer than the browser has seen is added unless a note for the same quest
-  // is already there. Defaults the browser already had and the user edited or deleted are left alone.
+  // (or with the same text) is already there. Defaults the browser already had and the user edited
+  // or deleted are left alone.
+  const sameText = (a, b) => a.trim().replace(/\s+/g, ' ').toLowerCase() === b.trim().replace(/\s+/g, ' ').toLowerCase();
+  const matchesWas = (n, w) => Object.entries(w).every(([k, v]) =>
+    (k === 'items' ? n.items.join(',') === v.join(',') : n[k] === v));
   function addDefaultNotes(p) {
     let seen = 0;
     try { seen = Number(localStorage.getItem(DEFAULTS_KEY)) || 0; } catch { /* storage unavailable */ }
     if (seen >= DEFAULTS_VERSION) return false;
     for (const d of DEFAULT_NOTES) {
-      const stale = p.notes.find(n => (d.was || []).some(w => n.lv === w.lv && n.text === w.text));
+      const stale = p.notes.find(n => (d.was || []).some(w => matchesWas(n, w)));
       if (stale) { Object.assign(stale, noteFields(d)); continue; }
       if (d.since <= seen) continue;
-      if (p.notes.some(n => n.quest && n.quest === d.quest)) continue;
+      if (p.notes.some(n => (d.quest && n.quest === d.quest) || sameText(n.text, d.text))) continue;
       p.notes.push({ id: uid(), ...noteFields(d) });
     }
     try { localStorage.setItem(DEFAULTS_KEY, String(DEFAULTS_VERSION)); } catch { /* storage unavailable */ }
@@ -541,11 +561,24 @@
   try { whNames = JSON.parse(localStorage.getItem(NAMES_KEY)) || {}; } catch { /* storage unavailable */ }
   const whTried = new Set();     // lookups started this session, so a failure isn't retried every render
 
+  // Wowhead's Forever data doesn't have everything yet, so a lookup falls back to Classic, and the
+  // link then points at the Classic page.
+  const WH_ENVS = [{ env: 16, path: 'forever' }, { env: 4, path: 'classic' }];
   function whLinkHTML(kind, id) {
     const key = `${kind}:${id}`;
     const known = whNames[key];
     const cls = known?.quality != null ? ` class="${QUALITY[known.quality] || ''}"` : '';
-    return `<a href="${WOWHEAD}${kind}=${id}" target="_blank" rel="noopener" data-wh="${key}"${cls}>${esc(known?.name || `${kind === 'item' ? 'Item' : 'Quest'} ${id}`)}</a>`;
+    const href = `https://www.wowhead.com/${known?.path || 'forever'}/${kind}=${id}`;
+    return `<a href="${href}" target="_blank" rel="noopener" data-wh="${key}"${cls}>${esc(known?.name || `${kind === 'item' ? 'Item' : 'Quest'} ${id}`)}</a>`;
+  }
+  async function lookupWowhead(kind, id) {
+    for (const { env, path } of WH_ENVS) {
+      const r = await fetch(`https://nether.wowhead.com/tooltip/${kind}/${id}?dataEnv=${env}&locale=0`);
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j?.name) return { name: String(j.name).slice(0, 120), path, ...(kind === 'item' && Number.isInteger(j.quality) && { quality: j.quality }) };
+    }
+    return null;
   }
   function fillWowheadNames() {
     document.querySelectorAll('#planner [data-wh]').forEach(a => {
@@ -553,11 +586,10 @@
       if (whNames[key] || whTried.has(key)) return;
       whTried.add(key);
       const [kind, id] = key.split(':');
-      fetch(`https://nether.wowhead.com/tooltip/${kind}/${id}?dataEnv=16&locale=0`)
-        .then(r => (r.ok ? r.json() : null))
-        .then(j => {
-          if (!j?.name) return;
-          whNames[key] = { name: String(j.name).slice(0, 120), ...(kind === 'item' && Number.isInteger(j.quality) && { quality: j.quality }) };
+      lookupWowhead(kind, id)
+        .then(found => {
+          if (!found) return;
+          whNames[key] = found;
           try { localStorage.setItem(NAMES_KEY, JSON.stringify(whNames)); } catch { /* storage unavailable */ }
           document.querySelectorAll(`#planner [data-wh="${key}"]`).forEach(el => { el.outerHTML = whLinkHTML(kind, id); });
         })
