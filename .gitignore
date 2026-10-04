@@ -25,3 +25,6 @@ desktop.ini
 
 # Scratch output from data refreshes
 *.raw.json
+
+# Local-only tooling that reads the addon from this machine
+scripts/import-addon.ps1

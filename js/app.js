@@ -383,7 +383,7 @@
             ${chain ? `
             <div>
               <h4>${chain.kind === 'required' ? 'Required quest chain' : 'Storyline'} <span class="dim">· ${prog.n}/${prog.total} done</span></h4>
-              ${chain.kind === 'storyline' ? '<p class="dim small">From Wowhead’s quest series — may include optional breadcrumb steps.</p>' : '<p class="dim small">Every step is required to unlock this quest (DungeonJournal).</p>'}
+              ${chain.kind === 'storyline' ? '<p class="dim small">From Wowhead’s quest series — may include optional breadcrumb steps.</p>' : '<p class="dim small">Every step is required to unlock this quest.</p>'}
               <ol class="chain">${chain.steps.map(s => stepHTML(s, prog.next?.id)).join('')}</ol>
               ${chain.after.length ? `<h4>Continues with</h4><ol class="chain after">${chain.after.map(s => stepHTML(s, null)).join('')}</ol>` : ''}
             </div>` : ''}
@@ -694,7 +694,7 @@
     if (!m.floors.length) {
       const byFloor = {};
       m.bosses.forEach(b => (byFloor[b.floor] ||= []).push(b.name));
-      return `<div class="ref-nomap"><p class="dim">This map uses the game’s own dungeon art, which isn’t bundled with DungeonJournal, so there’s no image here yet.</p>
+      return `<div class="ref-nomap"><p class="dim">No map image for this dungeon yet.</p>
         ${Object.entries(byFloor).map(([f, names]) => `<p><b>Level ${f}:</b> ${names.map(esc).join(', ')}</p>`).join('')}</div>`;
     }
     const floors = m.floors.filter(Boolean);
@@ -774,7 +774,7 @@
               }).join('')}</ul>` : '<p class="dim">No quest data yet.</p>'}
               ${routeFor ? `<h3>${esc(jd.route.title)}</h3><ol class="route">${jd.route.steps.map(s => `
                 <li><b>${esc(s.title)}</b><p>${esc(s.text)}</p>${s.map ? locHTML({ place: s.map.label, pt: pointFrom(s.map) }) : ''}</li>`).join('')}</ol>` : ''}
-              ${!jd ? '<p class="dim small">No DungeonJournal data for this dungeon yet.</p>' : `<p class="dim small">Bosses, map and route from ${esc(J.source || 'DungeonJournal')}.</p>`}
+              ${!jd ? '<p class="dim small">No boss or map data for this dungeon yet.</p>' : ''}
             </section>
           </div>
         </div>
