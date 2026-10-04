@@ -57,24 +57,65 @@
   }
   console.log(`Found ${rows.length} quest rows. Fetching Quick Facts…`);
 
-  // 2. Fetch each quest's Quick Facts (throttled).
-  const facts = {};
-  const ids = [...new Set(rows.map(r => r.id))];
-  for (let i = 0; i < ids.length; i += 3) {
-    await Promise.all(ids.slice(i, i + 3).map(async id => {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const html = await (await fetch(`/forever/quest=${id}`)).text();
-          const m = html.match(/printHtml\("(\[ul\]\[li\]Level.*?)", "infobox-contents/);
-          if (m) { facts[id] = m[1].replace(/\\\//g, '/'); return; }
-        } catch { /* retry */ }
-        await sleep(2000 * (attempt + 1));
-      }
-      console.warn('No Quick Facts for quest', id);
-    }));
-    await sleep(350);
-    if (i % 30 === 0) console.log(`  ${Math.min(i + 3, ids.length)}/${ids.length}`);
+  // The quest's series ("storyline") table, in order. The current quest is the <b> entry.
+  function parseSeries(html, selfId) {
+    const tables = [...html.matchAll(/<table class="series">([\s\S]*?)<\/table>/g)];
+    return tables.map(([, body]) => [...body.matchAll(/<tr>[\s\S]*?<\/tr>/g)].map(([tr]) => {
+      const a = tr.match(/href="\/forever\/quest=(\d+)[^"]*">([^<]+)<\/a>/);
+      if (a) return { id: +a[1], name: decode(a[2]) };
+      const b = tr.match(/<b>([^<]+)<\/b>/);
+      return b ? { id: selfId, name: decode(b[1]) } : null;
+    }).filter(Boolean)).filter(s => s.length > 1);
   }
+  const decode = s => { const t = document.createElement('textarea'); t.innerHTML = s; return t.value; };
+
+  // Where the quest starts, from the page's map data: zone name, x/y (0-100) and the NPC.
+  function parseStart(html) {
+    const at = html.indexOf('new Mapper(');
+    if (at < 0) return null;
+    let i = html.indexOf('{', at), depth = 0, j = i;
+    for (; j < html.length; j++) {
+      if (html[j] === '{') depth++;
+      else if (html[j] === '}' && --depth === 0) break;
+    }
+    try {
+      const mapper = JSON.parse(html.slice(i, j + 1));
+      for (const zone of Object.values(mapper.objectives || {})) {
+        for (const level of zone.levels || []) {
+          const p = level.find(pt => pt.point === 'start' && pt.coord);
+          if (p) return { zone: zone.zone, x: p.coord[0], y: p.coord[1], npc: p.name, src: 'wowhead' };
+        }
+      }
+    } catch { /* malformed map data */ }
+    return null;
+  }
+
+  // 2. Fetch each quest page (throttled; backs off if Wowhead starts refusing).
+  const pages = {};
+  const ids = [...new Set(rows.map(r => r.id))];
+  for (let i = 0; i < ids.length; i += 2) {
+    await Promise.all(ids.slice(i, i + 2).map(async id => {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          const res = await fetch(`/forever/quest=${id}`);
+          if (res.ok) {
+            const html = await res.text();
+            const m = html.match(/printHtml\("(\[ul\]\[li\]Level.*?)", "infobox-contents/);
+            if (m) {
+              pages[id] = { facts: m[1].replace(/\\\//g, '/'), series: parseSeries(html, id), startAt: parseStart(html) };
+              return;
+            }
+          }
+        } catch { /* retry */ }
+        console.warn(`Quest ${id}: attempt ${attempt + 1} failed, backing off…`);
+        await sleep(15000 * (attempt + 1));
+      }
+      console.warn('Gave up on quest', id);
+    }));
+    await sleep(600);
+    if (i % 20 === 0) console.log(`  ${Math.min(i + 2, ids.length)}/${ids.length}`);
+  }
+  const facts = Object.fromEntries(Object.entries(pages).map(([id, p]) => [id, p.facts]));
 
   // 3. Parse.
   const quests = rows.map(r => {
@@ -110,6 +151,9 @@
     else if (classes.length) o.classes = classes;
     const races = [...ex.matchAll(/\[race=(\d+)\]/g)].map(m => RACES[m[1]]).filter(Boolean);
     if (races.length) o.races = races;
+    const page = pages[r.id];
+    if (page?.startAt) o.startAt = page.startAt;
+    if (page?.series?.length) o.series = page.series;
     return o;
   });
 
