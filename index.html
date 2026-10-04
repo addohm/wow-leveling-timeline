@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forever Leveling Timeline</title>
+  <meta name="description" content="Level ranges for every WoW: Forever dungeon and its quests — when each quest turns orange, and when it goes grey.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 28 7v9c0 7-5 12-12 14C9 28 4 23 4 16V7z' fill='%23ffd100' stroke='%233a2a0a' stroke-width='2'/%3E%3Cpath d='M16 8v16M10 14h12' stroke='%233a2a0a' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="banner">
+    <p class="eyebrow">World of Warcraft: Forever</p>
+    <h1>Leveling Timeline</h1>
+    <p class="subtitle">Every dungeon, every dungeon quest, and the levels where they’re worth your time.</p>
+  </header>
+
+  <main>
+    <section class="frame controls" aria-label="Filters">
+      <div class="control level-control">
+        <label for="level">Your level</label>
+        <div class="level-row">
+          <input type="range" id="level" min="1" max="60" value="15">
+          <output id="level-out" for="level">15</output>
+        </div>
+      </div>
+
+      <div class="control">
+        <span class="control-label" id="faction-label">Faction</span>
+        <div class="seg" role="radiogroup" aria-labelledby="faction-label" data-key="faction">
+          <button type="button" role="radio" data-value="all">Both</button>
+          <button type="button" role="radio" data-value="A" class="seg-a">Alliance</button>
+          <button type="button" role="radio" data-value="H" class="seg-h">Horde</button>
+        </div>
+      </div>
+
+      <div class="control">
+        <span class="control-label" id="type-label">Dungeons</span>
+        <div class="seg" role="radiogroup" aria-labelledby="type-label" data-key="type">
+          <button type="button" role="radio" data-value="all">All</button>
+          <button type="button" role="radio" data-value="new">New</button>
+          <button type="button" role="radio" data-value="classic">Classic</button>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="search">Search</label>
+        <input type="search" id="search" placeholder="Quest, dungeon, NPC, zone…" autocomplete="off">
+      </div>
+
+      <div class="control checks">
+        <label class="check"><input type="checkbox" id="share"> <span>Shareable only</span></label>
+        <label class="check"><input type="checkbox" id="near"> <span>Only show my level (+1)</span></label>
+      </div>
+    </section>
+
+    <section class="frame" id="dungeons-panel" aria-labelledby="dungeons-h">
+      <div class="panel-head">
+        <h2 id="dungeons-h">Dungeons</h2>
+        <ul class="legend">
+          <li><i class="sw sw-dungeon"></i> Dungeon level range</li>
+          <li><span class="new-tag">New</span> New in Forever</li>
+          <li><i class="sw sw-you"></i> Your level</li>
+        </ul>
+      </div>
+      <div class="scroller"><div class="timeline" id="dungeon-timeline"></div></div>
+    </section>
+
+    <section class="frame" id="quests-panel" aria-labelledby="quests-h">
+      <div class="panel-head">
+        <h2 id="quests-h">Dungeon Quests</h2>
+        <div class="panel-tools">
+          <span id="quest-count" class="count"></span>
+          <button type="button" class="wow-btn small" id="clear-focus" hidden></button>
+          <button type="button" class="wow-btn small" id="expand-all">Expand all</button>
+          <button type="button" class="wow-btn small" id="collapse-all">Collapse all</button>
+        </div>
+      </div>
+      <ul class="legend">
+        <li><i class="sw sw-quest"></i> Orange (doable) until grey</li>
+        <li><span class="fac fac-a">A</span> Alliance</li>
+        <li><span class="fac fac-h">H</span> Horde</li>
+        <li><span class="fac fac-b">N</span> Both factions</li>
+        <li><span class="ico ico-share" aria-hidden="true">⇄</span> Shareable</li>
+        <li><span class="ico ico-noshare" aria-hidden="true">⇄</span> Not shareable</li>
+        <li><span class="tag">Pre</span> Prerequisite</li>
+        <li><span class="tag">Drop</span> Starts from a drop</li>
+        <li><span class="tag">Esc</span> Escort</li>
+        <li class="legend-diff">Name colour = difficulty at your level:
+          <b class="d-red">red</b> <b class="d-orange">orange</b> <b class="d-yellow">yellow</b> <b class="d-green">green</b> <b class="d-grey">grey</b>
+        </li>
+      </ul>
+      <div class="scroller"><div class="timeline" id="quest-timeline"></div></div>
+    </section>
+  </main>
+
+  <footer class="frame parchment">
+    <p>
+      Data from Wowhead’s
+      <a href="https://www.wowhead.com/forever/guide/dungeons-overview-locations-details">Dungeons Overview</a> and
+      <a href="https://www.wowhead.com/forever/guide/dungeons/every-dungeon-quest-location">Every Dungeon Quest</a>
+      guides, with difficulty levels from each quest’s Quick Facts. Forever is still in beta, so some data may change.
+      <span id="fetched"></span>
+    </p>
+    <p class="fine">Not affiliated with Blizzard Entertainment or Wowhead. World of Warcraft is a trademark of Blizzard Entertainment.</p>
+  </footer>
+
+  <div id="tip" class="tooltip" role="tooltip" hidden></div>
+
+  <script src="data/dungeons.js"></script>
+  <script src="data/quests.js"></script>
+  <script src="js/app.js"></script>
+  <script>const whTooltips = { colorLinks: false, iconizeLinks: false, renameLinks: false };</script>
+  <script src="https://wow.zamimg.com/js/tooltips.js" async></script>
+</body>
+</html>
