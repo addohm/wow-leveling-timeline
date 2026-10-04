@@ -255,15 +255,16 @@
     const rows = [];
     const list = DUNGEONS.filter(dungeonVisible)
       .flatMap(d => (d.wings || [null]).map(w => ({ d, w })))
-      .filter(({ d, w }) => !state.near || rangeNear((w || d).min, (w || d).max))
       .sort((a, b) => (a.w?.min ?? a.d.min) - (b.w?.min ?? b.d.min) || (a.w?.max ?? a.d.max) - (b.w?.max ?? b.d.max));
 
     for (const { d, w } of list) {
       const min = w ? w.min : d.min;
       const max = w ? w.max : d.max;
       const inRange = state.level >= min && state.level <= max;
+      // With "Only show my level (+1)" on, dungeons outside that range stay listed but faded.
+      const far = state.near && !rangeNear(min, max);
       rows.push(`
-        <div class="row d${inRange ? ' in-range' : ''}${focus === d.key ? ' selected' : ''}" data-d="${d.key}">
+        <div class="row d${inRange ? ' in-range' : ''}${far ? ' far' : ''}${focus === d.key ? ' selected' : ''}" data-d="${d.key}">
           <div class="label">
             ${bookBtn(d.key)}
             <a class="name" href="#g-${d.key}" data-jump="${d.key}">${esc(d.name)}${w ? ` <span class="wing-name">· ${esc(w.name)}</span>` : ''}</a>
