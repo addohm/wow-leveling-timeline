@@ -488,13 +488,6 @@ select:focus, input:focus-visible, button:focus-visible {
 
 .row.d .label .name { cursor: pointer; }
 .row.d.selected .label { box-shadow: inset 3px 0 0 var(--gold); background: #2c2214; }
-
-/* Dungeons outside your level (+1) when that filter is on: faded, not hidden. */
-.row.d .label > *, .row.d .bar { transition: opacity .15s; }
-.row.d.far .label > *, .row.d.far .bar { opacity: .28; }
-.row.d.far:hover .label > *, .row.d.far:hover .bar,
-.row.d.far:focus-within .label > *, .row.d.far:focus-within .bar,
-.row.d.far.selected .label > *, .row.d.far.selected .bar { opacity: .8; }
 .row.d.selected .label .name { color: var(--gold); }
 .row.d.selected .bar.dungeon { outline: 2px solid var(--gold); outline-offset: 1px; }
 

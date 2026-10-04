@@ -13,10 +13,9 @@ A classic-WoW-styled timeline of every **World of Warcraft: Forever** dungeon an
 For example, [Important Heirlooms](https://www.wowhead.com/forever/quest=96403/important-heirlooms)
 is red at 10, orange at 11, and grey at 22, so its bar runs from 11 to 22.
 
-Set your level to color quest names the way the in-game quest log does. By default the focus
-is on what you can do at your level (or will be able to at the next level): other dungeons are
-faded and other quests are hidden. Untick **Only show my level (+1)** to see everything at full
-strength. You can also filter by faction,
+Set your level to color quest names the way the in-game quest log does. By default only
+dungeons and quests you can do at your level (or will be able to at the next level) are shown;
+untick **Only show my level (+1)** to see everything. You can also filter by faction,
 shareable quests, class quests, or new vs. classic dungeons. Every setting is remembered in
 your browser.
 
@@ -85,7 +84,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=12`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=11`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally
