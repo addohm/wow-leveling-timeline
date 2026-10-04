@@ -37,12 +37,12 @@
       { t: 'zone', k: 'westfall', from: 18, end: 20 },
       { t: 'dungeon', k: 'dm', from: 20, end: 22 },
     ],
-    notes: [{ lv: 13, text: 'Start the sleeping bag chain', quest: '79008' }],
+    notes: [{ lv: 13, text: 'Start the sleeping bag chain', links: ['79008'] }],
   };
 
   // Notes every planner starts with. Each is added once per browser (tracked by DEFAULTS_KEY), so
   // deleting one keeps it gone. Bump DEFAULTS_VERSION when adding a new default note.
-  const DEFAULT_NOTES = [{ lv: 13, text: 'Start the sleeping bag chain', quest: '79008' }];
+  const DEFAULT_NOTES = [{ lv: 13, text: 'Start the sleeping bag chain', links: ['79008'] }];
   const DEFAULTS_KEY = 'forever-planner-defaults';
   const DEFAULTS_VERSION = 1;
 
@@ -59,7 +59,8 @@
   // or { t: 'custom', name, from, end }.
   // A step with from === end is a single point on the axis (a dungeon run that doesn't take a whole level).
   // Steps are kept sorted by level and may overlap, e.g. a dungeon run in the middle of a zone.
-  // Notes: { lv, text, quest?, url? } pinned to a level; `quest` is a Wowhead quest ID, `url` any web link.
+  // Notes: { lv, text, links: [] } pinned to a level; each link is a Wowhead quest ID, a web address,
+  // or text to search Wowhead for.
   function clean(p) {
     const out = {
       faction: p?.faction === 'H' ? 'H' : 'A',
@@ -88,38 +89,56 @@
     for (const n of Array.isArray(p?.notes) ? p.notes : []) {
       const text = String(n?.text ?? '').trim().slice(0, 200);
       if (!text) continue;
-      const quest = /^\d{1,7}$/.test(String(n.quest ?? '')) ? String(n.quest) : '';
-      const url = quest ? '' : parseLink(n.url).url || '';
-      out.notes.push({ id: uid(), lv: clampInt(n.lv, 1, 60, 1), text, quest, url });
+      // Older notes had a single `quest` or `url` instead of `links`.
+      const raw = [...(Array.isArray(n.links) ? n.links : []), n.quest, n.url];
+      const links = [...new Set(raw.map(l => parseLink(l).link).filter(Boolean))].slice(0, MAX_LINKS);
+      out.notes.push({ id: uid(), lv: clampInt(n.lv, 1, 60, 1), text, links });
     }
     sortSteps(out);
     return out;
   }
 
-  // Level order; a zone or longer run comes before a point that starts at the same level.
-  // A note's link: a Wowhead quest ID, or an http(s) address. Returns {} when empty, { error } when invalid.
+  // One entry from a note's links: a Wowhead quest ID, an http(s) address, or anything else as a
+  // Wowhead search. Returns { link } with the normalised entry, {} when empty, or { error }.
+  const MAX_LINKS = 10;
   function parseLink(raw) {
     const s = String(raw ?? '').trim();
     if (!s) return {};
-    if (/^\d{1,7}$/.test(s)) return { quest: s };
-    try {
-      const u = new URL(/^[a-z][\w+.-]*:/i.test(s) ? s : `https://${s}`);
-      if ((u.protocol === 'https:' || u.protocol === 'http:') && u.hostname.includes('.') && u.href.length <= 500) return { url: u.href };
-    } catch { /* not a URL */ }
-    return { error: 'Enter a Wowhead quest ID like 96403, or a web address like https://www.wowhead.com/…' };
+    if (/^\d{1,7}$/.test(s)) return { link: s };
+    const scheme = /^[a-z][\w+.-]*:/i.test(s);
+    if (scheme || /^[^\s/]+\.[a-z]{2,}(?:[/?#:]|$)/i.test(s)) {
+      try {
+        const u = new URL(scheme ? s : `https://${s}`);
+        if ((u.protocol === 'https:' || u.protocol === 'http:') && u.hostname.includes('.') && u.href.length <= 500) return { link: u.href };
+      } catch { /* not a URL */ }
+      return { error: `“${s.slice(0, 40)}” isn’t a web address starting with http:// or https://.` };
+    }
+    return { link: s.slice(0, 80) };
+  }
+  // A comma-separated list of links, like "79008, https://youtube.com/…, linkens boomerang".
+  function parseLinks(raw) {
+    const links = [];
+    for (const part of String(raw ?? '').split(',')) {
+      const r = parseLink(part);
+      if (r.error) return r;
+      if (r.link && !links.includes(r.link)) links.push(r.link);
+    }
+    if (links.length > MAX_LINKS) return { error: `A note can have up to ${MAX_LINKS} links.` };
+    return { links };
   }
 
   // Validates note fields; returns the note's values or { error }.
-  function readNote(lvRaw, textRaw, linkRaw) {
+  function readNote(lvRaw, textRaw, linksRaw) {
     const lv = Math.round(Number(String(lvRaw).trim()));
     const text = String(textRaw).trim();
     if (!String(lvRaw).trim() || !(lv >= 1 && lv <= 60)) return { error: 'Enter a level from 1 to 60.' };
     if (!text) return { error: 'Enter the note text.' };
-    const link = parseLink(linkRaw);
-    if (link.error) return link;
-    return { lv, text: text.slice(0, 200), quest: link.quest || '', url: link.url || '' };
+    const r = parseLinks(linksRaw);
+    if (r.error) return r;
+    return { lv, text: text.slice(0, 200), links: r.links };
   }
 
+  // Level order; a zone or longer run comes before a point that starts at the same level.
   function sortSteps(p) {
     p.steps = p.steps.map((s, i) => [s, i])
       .sort(([a, i], [b, j]) => a.from - b.from || (b.end - b.from) - (a.end - a.from) || i - j)
@@ -135,7 +154,7 @@
         if (!s.wing) delete s.wing;
         return s;
       }),
-      notes: p.notes.map(n => ({ lv: n.lv, text: n.text, ...(n.quest && { quest: n.quest }), ...(n.url && { url: n.url }) })),
+      notes: p.notes.map(n => ({ lv: n.lv, text: n.text, ...(n.links.length && { links: n.links }) })),
     };
   }
 
@@ -155,10 +174,10 @@
     try { seen = Number(localStorage.getItem(DEFAULTS_KEY)) || 0; } catch { /* storage unavailable */ }
     if (seen >= DEFAULTS_VERSION) return false;
     for (const d of DEFAULT_NOTES) {
-      if (p.notes.some(n => n.quest === d.quest)) continue;
-      const same = p.notes.find(n => !n.quest && !n.url && /sleeping bag/i.test(n.text) && /sleeping bag/i.test(d.text));
-      if (same) same.quest = d.quest;
-      else p.notes.push({ id: uid(), url: '', ...d });
+      if (p.notes.some(n => n.links.some(l => d.links.includes(l)))) continue;
+      const same = p.notes.find(n => !n.links.length && /sleeping bag/i.test(n.text) && /sleeping bag/i.test(d.text));
+      if (same) same.links = [...d.links];
+      else p.notes.push({ id: uid(), ...d, links: [...d.links] });
     }
     try { localStorage.setItem(DEFAULTS_KEY, String(DEFAULTS_VERSION)); } catch { /* storage unavailable */ }
     return true;
@@ -445,18 +464,23 @@
       </div>`;
   }
 
-  function noteLinkHTML(n) {
-    if (n.url) {
-      let host = n.url;
-      try { host = new URL(n.url).hostname.replace(/^www\./, ''); } catch { /* keep the raw link */ }
-      return ` <a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(host)} ↗</a>`;
+  // A quest we have data for opens on the Timeline; other quest IDs, web addresses and search
+  // terms open in a new tab.
+  function linkHTML(link, lv) {
+    if (/^\d+$/.test(link)) {
+      const q = questById.get(+link);
+      return q
+        ? `<a href="#" class="d-${diffAt(q, lv)}" data-goto="${q.id}" data-tip="q:${q.idx}">${esc(q.name)}</a>`
+        : `<a href="${WOWHEAD}quest=${esc(link)}" target="_blank" rel="noopener">Quest ${esc(link)} on Wowhead ↗</a>`;
     }
-    if (!n.quest) return '';
-    const q = questById.get(+n.quest);
-    return q
-      ? ` <a href="#" class="d-${diffAt(q, n.lv)}" data-goto="${q.id}" data-tip="q:${q.idx}">${esc(q.name)}</a>`
-      : ` <a href="${WOWHEAD}quest=${esc(n.quest)}" target="_blank" rel="noopener">Quest ${esc(n.quest)} on Wowhead ↗</a>`;
+    if (/^https?:\/\//.test(link)) {
+      let host = link;
+      try { host = new URL(link).hostname.replace(/^www\./, ''); } catch { /* keep the raw link */ }
+      return `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">${esc(host)} ↗</a>`;
+    }
+    return `<a href="${WOWHEAD}search?q=${encodeURIComponent(link)}" target="_blank" rel="noopener" title="Search Wowhead">🔍 ${esc(link)}</a>`;
   }
+  const noteLinkHTML = n => (n.links.length ? ` <span class="note-links">${n.links.map(l => linkHTML(l, n.lv)).join('<span class="dim"> · </span>')}</span>` : '');
 
   let editingNote = null;          // id of the note being edited in place
 
@@ -469,7 +493,7 @@
             <form class="note-form" data-edit-note="${n.id}" novalidate>
               <input type="number" class="num" data-nf="lv" min="1" max="60" step="1" value="${n.lv}" aria-label="Level">
               <input type="text" data-nf="text" value="${esc(n.text)}" maxlength="200" aria-label="Note">
-              <input type="text" data-nf="link" value="${esc(n.url || n.quest)}" placeholder="Link: quest ID or URL (optional)" maxlength="500" aria-label="Link: Wowhead quest ID or web address">
+              <input type="text" data-nf="link" value="${esc(n.links.join(', '))}" placeholder="Links, comma-separated (optional)" maxlength="2000" aria-label="Links, comma-separated: quest IDs, web addresses or Wowhead search terms">
               <span class="note-actions">
                 <button type="submit" class="wow-btn small">Save</button>
                 <button type="button" class="wow-btn small" data-cancel-note>Cancel</button>
