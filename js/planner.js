@@ -1156,7 +1156,7 @@
   // Quests marked complete on the timeline show as done here too.
   document.addEventListener('forever:done', () => { if (!$('#planner').hidden) render(); });
 
-  // Lets the Timeline tab add a dungeon to the route, or jump to it here.
+  // Lets the Dungeon Timeline tab add a dungeon to the route, or jump to it here.
   window.ForeverPlanner = {
     has: key => plan.steps.some(s => s.t === 'dungeon' && s.k === key),
     add(key) {
