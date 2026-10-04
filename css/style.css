@@ -1095,12 +1095,14 @@ ul.ref-quests li.skipped a { opacity: .45; text-decoration: line-through; }
 .note-help { margin: 2px 0 0; }
 .note-help code { color: var(--ink); font-size: 12px; }
 .note-links a { white-space: nowrap; }
+/* Sized for what goes in them: level is two digits, a quest ID up to six. */
 .note-form {
   display: grid;
-  grid-template-columns: 64px minmax(0, 3fr) minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 1.4fr) auto;
+  grid-template-columns: 62px minmax(0, 3fr) 96px minmax(0, 1.2fr) minmax(0, 1.3fr) minmax(0, 1.3fr) auto;
   gap: 8px;
   align-items: center;
 }
+.note-form input { width: 100%; }
 .note-video { color: #ff6b6b; }
 .form-err { min-height: 1.2em; margin: 4px 0 0; font-size: 14px; color: var(--d-red); }
 
@@ -1140,8 +1142,9 @@ footer.frame { margin-top: 26px; margin-bottom: 36px; }
   #route-timeline { --label-w: 230px; --track-min: 540px; }
   .pnum, .row.pstep .new-tag, .row.pstep .prep-badge { display: none; }
   input.num.plv { width: 42px; }
-  .note-form { grid-template-columns: 70px minmax(0, 1fr); }
-  .note-form [data-nf="quest"], .note-form [data-nf="items"] { grid-column: span 1; }
+  /* Level + note, then quest + items, then one per row. */
+  .note-form { grid-template-columns: 62px 34px minmax(0, 1fr); }
+  .note-form [data-nf="text"], .note-form [data-nf="quest"] { grid-column: span 2; }
   .note-form [data-nf="video"], .note-form [data-nf="urls"], .note-form > .wow-btn, .note-form .note-actions { grid-column: 1 / -1; }
   .add-row select { flex: 1 1 100%; min-width: 0; }
   .add-label { width: auto; flex-basis: 100%; }
