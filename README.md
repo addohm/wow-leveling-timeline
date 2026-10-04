@@ -66,8 +66,8 @@ step itself to move it. A step whose min and max are the same is a single point.
   include a start time (`pGR_66uhwSY?t=465`). Quest and item links go to Wowhead. **Links**
   takes any other web addresses, comma-separated. All of these are optional, and **Edit**
   changes any of them.
-- **Default notes**: every planner starts with 17 notes for worthwhile questlines from level 2
-  to 56 (Bag of Marbles, the sleeping bag, Linken's Boomerang, the LBRS/UBRS trinkets and more).
+- **Default notes**: every planner starts with 18 notes, mostly worthwhile questlines from level 2
+  to 56 (cooking at 5, Bag of Marbles, the sleeping bag, Linken's Boomerang, the LBRS/UBRS trinkets and more).
   They live in `DEFAULT_NOTES` in `js/planner.js`. To add one, give it `since` set to the next
   `DEFAULTS_VERSION` and bump that; to change one, add its previous values to `was` and bump it.
   Untouched copies update, and notes people edited or deleted are left alone.
@@ -103,7 +103,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=26`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=27`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally

@@ -49,6 +49,8 @@
   const DEFAULT_NOTES = [
     def(3, 2, 'Bag of Marbles Questline Start', '47', ['1191'], MARBLES, 328,
       [{ lv: 2, text: 'Bag of Marbles Questline Start', quest: '47', items: ['1191'], video: MARBLES, t: 334 }]),
+    { ...def(5, 5, 'Learning cooking to keep well fed buff alive', '', [], ''),
+      urls: ['https://www.wowhead.com/forever/guide/professions/cooking/overview-leveling'] },
     def(1, 14, 'Sleeping bag chain begins for exp boost and bag (3% exp buff and 12 slot bag)', '79008', ['211527', '1652'], 'tILWPzAyqLQ', 0, [
       { lv: 13, text: 'Start the sleeping bag chain' },
       { lv: 14, text: 'Sleeping bag chain begins for exp boost and bag' },
@@ -72,7 +74,7 @@
     def(4, 56, 'UBRS Trinket Questline Start', '5089', ['13965', '13968', '13966'], GEAR, 601),
   ];
   const DEFAULTS_KEY = 'forever-planner-defaults';
-  const DEFAULTS_VERSION = 4;
+  const DEFAULTS_VERSION = 5;
   const noteFields = d => ({ lv: d.lv, text: d.text, quest: d.quest, items: [...d.items], video: d.video, t: d.t, urls: [...(d.urls || [])] });
   EXAMPLE.notes = DEFAULT_NOTES.map(noteFields);
 
