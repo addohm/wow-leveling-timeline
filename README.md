@@ -96,7 +96,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=3`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=4`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally

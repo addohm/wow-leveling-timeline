@@ -442,10 +442,10 @@
     const zones = ZONES.filter(z => z.side === 'C' || z.side === plan.faction).sort((a, b) => a.min - b.min || a.name.localeCompare(b.name));
     const dungeons = [...DUNGEONS].sort((a, b) => a.min - b.min || a.max - b.max);
     sel.innerHTML = `
-      <optgroup label="Zones">${zones.map(z => `<option value="zone:${z.key}">${esc(z.name)} (${z.min}–${z.max})</option>`).join('')}</optgroup>
+      <optgroup label="Zones">${zones.map(z => `<option value="zone:${z.key}">${esc(z.name)}</option>`).join('')}</optgroup>
       <optgroup label="Dungeons">${dungeons.map(d => (d.wings
-        ? d.wings.map(w => `<option value="dungeon:${d.key}:${esc(w.name)}">${esc(d.name)} · ${esc(w.name)} (${w.min}–${w.max})</option>`).join('')
-        : `<option value="dungeon:${d.key}">${esc(d.name)} (${d.min}–${d.max})</option>`)).join('')}</optgroup>
+        ? d.wings.map(w => `<option value="dungeon:${d.key}:${esc(w.name)}">${esc(d.name)} · ${esc(w.name)}</option>`).join('')
+        : `<option value="dungeon:${d.key}">${esc(d.name)}</option>`)).join('')}</optgroup>
       <option value="custom">Custom…</option>`;
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
     else prefillAdd();
