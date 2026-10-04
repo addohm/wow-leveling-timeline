@@ -1,4 +1,4 @@
-# WoW: Forever Leveling Timeline
+# WoW: Forever Dungeon Timeline
 
 A classic-WoW-styled timeline of every **World of Warcraft: Forever** dungeon and its dungeon quests.
 
