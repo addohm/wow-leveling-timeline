@@ -585,6 +585,7 @@
     save();
     rerenderKeepingScroll();
     if (ref.open) renderReference(ref.dataset.key);
+    document.dispatchEvent(new Event('forever:done'));
   });
   document.addEventListener('keydown', e => {
     const tog = e.target.closest?.('[data-toggle]');
@@ -803,4 +804,10 @@
 
   syncControls();
   renderAll();
+
+  // Shared with the route planner (js/planner.js).
+  window.ForeverTimeline = {
+    DUNGEONS, QUESTS, questById, byKey, done, ZONES,
+    diffAt, questLocation, locHTML, chainFor, chainProgress, esc, toast,
+  };
 })();

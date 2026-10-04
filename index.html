@@ -18,8 +18,13 @@
     <p class="subtitle">Every dungeon, every dungeon quest, and the levels where they’re worth your time.</p>
   </header>
 
+  <nav class="tabs" role="tablist" aria-label="View">
+    <button type="button" role="tab" id="tab-timeline" data-tab="timeline" aria-controls="dungeons-panel">Timeline</button>
+    <button type="button" role="tab" id="tab-planner" data-tab="planner" aria-controls="planner">Route Planner</button>
+  </nav>
+
   <main>
-    <section class="frame controls" aria-label="Filters">
+    <section class="frame controls" aria-label="Filters" data-view="timeline">
       <div class="control level-control">
         <label for="level">Your level</label>
         <div class="level-row">
@@ -69,7 +74,7 @@
       </div>
     </section>
 
-    <section class="frame" id="dungeons-panel" aria-labelledby="dungeons-h">
+    <section class="frame" id="dungeons-panel" aria-labelledby="dungeons-h" data-view="timeline">
       <div class="panel-head">
         <h2 id="dungeons-h">Dungeons</h2>
         <ul class="legend">
@@ -81,7 +86,7 @@
       <div class="scroller"><div class="timeline" id="dungeon-timeline"></div></div>
     </section>
 
-    <section class="frame" id="quests-panel" aria-labelledby="quests-h">
+    <section class="frame" id="quests-panel" aria-labelledby="quests-h" data-view="timeline">
       <div class="panel-head">
         <h2 id="quests-h">Dungeon Quests</h2>
         <div class="panel-tools">
@@ -110,6 +115,69 @@
       </ul>
       <div class="scroller"><div class="timeline" id="quest-timeline"></div></div>
     </section>
+
+    <section class="frame controls" aria-label="Route settings" data-view="planner" hidden>
+      <div class="control">
+        <span class="control-label" id="p-faction-label">Faction</span>
+        <div class="seg" role="radiogroup" aria-labelledby="p-faction-label" id="p-faction">
+          <button type="button" role="radio" data-value="A" class="seg-a">Alliance</button>
+          <button type="button" role="radio" data-value="H" class="seg-h">Horde</button>
+        </div>
+      </div>
+      <div class="control">
+        <label for="p-cls">Class</label>
+        <select id="p-cls">
+          <option value="">Any</option>
+          <option>Druid</option><option>Hunter</option><option>Mage</option>
+          <option>Paladin</option><option>Priest</option><option>Rogue</option>
+          <option>Shaman</option><option>Warlock</option><option>Warrior</option>
+        </select>
+      </div>
+      <div class="control">
+        <label for="p-start">Starting level</label>
+        <input type="number" id="p-start" class="num" min="1" max="59" step="1">
+      </div>
+      <div class="control">
+        <span class="control-label">Route</span>
+        <div class="panel-tools">
+          <button type="button" class="wow-btn small" id="p-share">Copy share link</button>
+          <button type="button" class="wow-btn small" id="p-example">Load example</button>
+          <button type="button" class="wow-btn small" id="p-clear">Clear route</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="frame" id="planner" aria-labelledby="planner-h" data-view="planner" hidden>
+      <div class="panel-head">
+        <h2 id="planner-h">Route Planner</h2>
+        <ul class="legend">
+          <li><i class="sw sw-zone"></i> Zone questing</li>
+          <li><i class="sw sw-prep"></i> Dungeon quest pickups</li>
+          <li><i class="sw sw-dungeon"></i> Dungeon run</li>
+          <li><i class="sw sw-note"></i> Level note</li>
+          <li><span class="warn-ico">⚠</span> Warning</li>
+        </ul>
+      </div>
+      <p class="dim small planner-help">Each step starts where the one before it ends. Set the level you’ll leave each step at, click a step for details, and pin notes to a level. Your route is saved in this browser.</p>
+      <div class="scroller"><div class="timeline" id="route-timeline"></div></div>
+      <div class="add-row">
+        <select id="p-add" aria-label="Zone or dungeon to add"></select>
+        <button type="button" class="wow-btn" id="p-add-btn">Add to route</button>
+        <span class="dim small" id="p-add-hint"></span>
+      </div>
+
+      <div class="notes-panel">
+        <h3>Level notes</h3>
+        <ul class="note-list" id="p-notes"></ul>
+        <form class="note-form" id="p-note-form" novalidate>
+          <input type="number" id="p-note-lv" class="num" min="1" max="60" step="1" placeholder="13" aria-label="Level">
+          <input type="text" id="p-note-text" placeholder="Start the sleeping bag chain" aria-label="Note" maxlength="200">
+          <input type="text" id="p-note-quest" placeholder="Wowhead quest ID (optional)" aria-label="Wowhead quest ID" inputmode="numeric">
+          <button type="submit" class="wow-btn small">Add note</button>
+        </form>
+        <p class="form-err" id="p-note-err" role="alert"></p>
+      </div>
+    </section>
   </main>
 
   <footer class="frame parchment">
@@ -131,7 +199,9 @@
   <script src="data/dungeons.js"></script>
   <script src="data/quests.js"></script>
   <script src="data/journal.js"></script>
+  <script src="data/zones.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/planner.js"></script>
   <script>const whTooltips = { colorLinks: false, iconizeLinks: false, renameLinks: false };</script>
   <script src="https://wow.zamimg.com/js/tooltips.js" async></script>
 </body>
