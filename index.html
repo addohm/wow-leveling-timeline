@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=21">
+  <link rel="stylesheet" href="css/style.css?v=22">
 </head>
 <body>
   <header class="banner">
@@ -207,10 +207,11 @@
           <input type="text" data-nf="quest" placeholder="Quest ID" aria-label="Quest: Wowhead quest ID or link">
           <input type="text" data-nf="items" placeholder="Item IDs" aria-label="Items: Wowhead item IDs or links, comma-separated">
           <input type="text" data-nf="video" placeholder="YouTube ID or link" aria-label="Video: YouTube video ID or link">
+          <input type="text" data-nf="urls" placeholder="Links" aria-label="Links: web addresses, comma-separated">
           <button type="submit" class="wow-btn small">Add note</button>
         </form>
         <p class="form-err" id="p-note-err" role="alert"></p>
-        <p class="dim small note-help">Quest, items and video are optional. Each takes an ID or a full link: a quest like <code>727</code>, items like <code>4984, 2820</code>, and a video like <code>pGR_66uhwSY?t=465</code> (the time is optional).</p>
+        <p class="dim small note-help">Everything after the note is optional. Quest, items and video take an ID or a full link: a quest like <code>727</code>, items like <code>4984, 2820</code>, and a video like <code>pGR_66uhwSY?t=465</code> (the time is optional). Links takes any web addresses, separated by commas.</p>
       </div>
     </section>
   </main>
@@ -240,12 +241,12 @@
     </form>
   </dialog>
 
-  <script src="data/dungeons.js?v=21"></script>
-  <script src="data/quests.js?v=21"></script>
-  <script src="data/journal.js?v=21"></script>
-  <script src="data/zones.js?v=21"></script>
-  <script src="js/app.js?v=21"></script>
-  <script src="js/planner.js?v=21"></script>
+  <script src="data/dungeons.js?v=22"></script>
+  <script src="data/quests.js?v=22"></script>
+  <script src="data/journal.js?v=22"></script>
+  <script src="data/zones.js?v=22"></script>
+  <script src="js/app.js?v=22"></script>
+  <script src="js/planner.js?v=22"></script>
   <script>const whTooltips = { colorLinks: false, iconizeLinks: false, renameLinks: false };</script>
   <script src="https://wow.zamimg.com/js/tooltips.js" async></script>
 </body>

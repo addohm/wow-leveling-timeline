@@ -1074,7 +1074,7 @@ ul.ref-quests li.skipped a { opacity: .45; text-decoration: line-through; }
 .note-links a { white-space: nowrap; }
 .note-form {
   display: grid;
-  grid-template-columns: 70px minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.6fr) auto;
+  grid-template-columns: 64px minmax(0, 3fr) minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 1.4fr) auto;
   gap: 8px;
   align-items: center;
 }
@@ -1119,7 +1119,7 @@ footer.frame { margin-top: 26px; margin-bottom: 36px; }
   input.num.plv { width: 42px; }
   .note-form { grid-template-columns: 70px minmax(0, 1fr); }
   .note-form [data-nf="quest"], .note-form [data-nf="items"] { grid-column: span 1; }
-  .note-form [data-nf="video"], .note-form > .wow-btn, .note-form .note-actions { grid-column: 1 / -1; }
+  .note-form [data-nf="video"], .note-form [data-nf="urls"], .note-form > .wow-btn, .note-form .note-actions { grid-column: 1 / -1; }
   .add-row select { flex: 1 1 100%; min-width: 0; }
   .add-label { width: auto; flex-basis: 100%; }
   .group-head .plan-btn .pl-text { display: none; }
