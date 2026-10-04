@@ -37,8 +37,14 @@
       { t: 'zone', k: 'westfall', from: 18, end: 20 },
       { t: 'dungeon', k: 'dm', from: 20, end: 22 },
     ],
-    notes: [{ lv: 13, text: 'Start the sleeping bag chain' }],
+    notes: [{ lv: 13, text: 'Start the sleeping bag chain', quest: '79008' }],
   };
+
+  // Notes every planner starts with. Each is added once per browser (tracked by DEFAULTS_KEY), so
+  // deleting one keeps it gone. Bump DEFAULTS_VERSION when adding a new default note.
+  const DEFAULT_NOTES = [{ lv: 13, text: 'Start the sleeping bag chain', quest: '79008' }];
+  const DEFAULTS_KEY = 'forever-planner-defaults';
+  const DEFAULTS_VERSION = 1;
 
   const $ = sel => document.querySelector(sel);
   const clampInt = (v, lo, hi, dflt) => {
@@ -142,7 +148,24 @@
     catch { /* storage unavailable */ }
   }
 
+  // A note already about the same thing (same quest, or a sleeping bag note without a link) gets
+  // the default's link instead of a duplicate.
+  function addDefaultNotes(p) {
+    let seen = 0;
+    try { seen = Number(localStorage.getItem(DEFAULTS_KEY)) || 0; } catch { /* storage unavailable */ }
+    if (seen >= DEFAULTS_VERSION) return false;
+    for (const d of DEFAULT_NOTES) {
+      if (p.notes.some(n => n.quest === d.quest)) continue;
+      const same = p.notes.find(n => !n.quest && !n.url && /sleeping bag/i.test(n.text) && /sleeping bag/i.test(d.text));
+      if (same) same.quest = d.quest;
+      else p.notes.push({ id: uid(), url: '', ...d });
+    }
+    try { localStorage.setItem(DEFAULTS_KEY, String(DEFAULTS_VERSION)); } catch { /* storage unavailable */ }
+    return true;
+  }
+
   let plan = load();
+  if (addDefaultNotes(plan)) save();
   const open = new Set();          // step ids whose details are expanded
 
   // ---------- Share links ----------

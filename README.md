@@ -53,7 +53,9 @@ step itself to move it. A step whose min and max are the same is a single point.
   there, zones you'll outlevel, and levels nothing in the route covers (shaded).
 - **Level notes**: reminders pinned to a level, like "at 13, start the sleeping bag chain".
   They stay at that level when steps move. A note can link a Wowhead quest ID or any web
-  address, and **Edit** changes its level, text or link.
+  address, and **Edit** changes its level, text or link. Every planner starts with a note at
+  13 to start the sleeping bag chain ([quest 79008](https://www.wowhead.com/forever/quest=79008));
+  default notes live in `DEFAULT_NOTES` in `js/planner.js`.
 - **Share**: *Copy share link* puts the whole route in the URL. Routes are saved in your browser.
 
 ## Files
@@ -86,7 +88,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=14`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=15`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally
