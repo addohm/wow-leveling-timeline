@@ -381,14 +381,15 @@
     return w;
   }
 
-  // Levels between the starting level and the end of the route that no step spans.
+  // Levels between the starting level and the end of the route that no step covers. A step spans
+  // [from, end); a single point at level L counts as covering level L.
   function gaps() {
     const out = [];
     let cursor = plan.start;
     for (const s of plan.steps) {
-      if (s.end <= s.from) continue;
+      const end = Math.max(s.end, s.from + 1);
       if (s.from > cursor) out.push([cursor, s.from]);
-      cursor = Math.max(cursor, s.end);
+      cursor = Math.max(cursor, end);
     }
     const last = routeEnd();
     if (last > cursor) out.push([cursor, last]);
