@@ -160,17 +160,18 @@
   // Required chains come from DungeonJournal (curated, no optional breadcrumbs).
   // Otherwise Wowhead's quest series is used, which can include optional steps.
   function chainFor(q) {
+    const series = (q.series || []).find(s => s.some(x => x.id === q.id)) || [];
+    const at = series.findIndex(x => x.id === q.id);
+    const after = at >= 0 ? series.slice(at + 1) : [];
     const req = J.chains[q.id];
     if (req?.length) {
-      return { kind: 'required', steps: [...req.map(s => ({ ...s })), { id: q.id, name: q.name, self: true }], after: [] };
+      return { kind: 'required', steps: [...req.map(s => ({ ...s })), { id: q.id, name: q.name, self: true }], after };
     }
-    const series = (q.series || []).find(s => s.some(x => x.id === q.id));
-    if (!series || series.length < 2) return null;
-    const at = series.findIndex(x => x.id === q.id);
+    if (series.length < 2) return null;
     return {
       kind: 'storyline',
       steps: series.slice(0, at + 1).map(s => ({ ...s, self: s.id === q.id })),
-      after: series.slice(at + 1),
+      after,
     };
   }
   function chainProgress(chain) {
