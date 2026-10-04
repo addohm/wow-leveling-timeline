@@ -88,7 +88,7 @@
 
   // ---------- Plan state ----------
   // Steps: { t: 'zone', k, from, end }, { t: 'dungeon', k, wing?, from, end, pick: { questId: bool } },
-  // or { t: 'custom', name, from, end }.
+  // or { t: 'custom', name, from, end }; any of them may have `done: true` once completed.
   // A step with from === end is a single point on the axis (a dungeon run that doesn't take a whole level).
   // Steps are kept sorted by level and may overlap, e.g. a dungeon run in the middle of a zone.
   // Notes: { lv, text, quest, items: [], video, t } pinned to a level: a Wowhead quest ID, Wowhead
@@ -118,6 +118,7 @@
       } else if (s?.t === 'custom' && String(s.name ?? '').trim()) {
         out.steps.push({ id: uid(), t: 'custom', name: String(s.name).trim().slice(0, 60), from, end });
       } else continue;
+      if (s.done === true) out.steps[out.steps.length - 1].done = true;
       chain = end;
     }
     for (const n of Array.isArray(p?.notes) ? p.notes : []) {
@@ -265,6 +266,7 @@
       steps: p.steps.map(({ id, ...s }) => {
         if (s.pick && !Object.keys(s.pick).length) delete s.pick;
         if (!s.wing) delete s.wing;
+        if (!s.done) delete s.done;
         return s;
       }),
       notes: p.notes.map(n => ({
@@ -381,18 +383,19 @@
     return w;
   }
 
-  // Levels between the starting level and the end of the route that no step covers. A step spans
-  // [from, end); a single point at level L counts as covering level L.
+  // Runs of whole levels, from the start of the route to its end, that no step covers, as
+  // [first, last]. A step covers every level from its start to its end, so a single point covers
+  // just its own level.
   function gaps() {
+    if (!plan.steps.length) return [];
+    const covered = new Set();
+    for (const s of plan.steps) for (let l = s.from; l <= s.end; l++) covered.add(l);
     const out = [];
-    let cursor = plan.start;
-    for (const s of plan.steps) {
-      const end = Math.max(s.end, s.from + 1);
-      if (s.from > cursor) out.push([cursor, s.from]);
-      cursor = Math.max(cursor, end);
+    for (let l = plan.start, last = routeEnd(); l <= last; l++) {
+      if (covered.has(l)) continue;
+      const run = out[out.length - 1];
+      if (run && run[1] === l - 1) run[1] = l; else out.push([l, l]);
     }
-    const last = routeEnd();
-    if (last > cursor) out.push([cursor, last]);
     return out;
   }
 
@@ -403,17 +406,20 @@
   }
 
   // ---------- Rendering ----------
-  // The axis always covers every level, 1–60.
-  const AMIN = 1, AMAX = 60;
+  // The axis covers levels 1–60, or with "Zoom to my level" from ZOOM_BACK below your level to 60
+  // (nothing much lower is still worth doing). setAxis() runs at the start of every render.
+  const AMAX = 60, ZOOM_BACK = 3;
+  let AMIN = 1;
+  const setAxis = L => { AMIN = view.zoom ? Math.max(1, Math.min(AMAX - 5, L - ZOOM_BACK)) : 1; };
   const pct = L => ((Math.max(AMIN, Math.min(AMAX, L)) - AMIN) / (AMAX - AMIN)) * 100;
 
   // ---------- Level filter ----------
   // The planner has its own "your level" (starting at 1). It can hide or fade route steps outside
-  // your level (+2), always keeping at least MIN_SHOWN of them: when fewer are in range, the steps
-  // nearest that range fill in. These settings, and whether the notes are collapsed, are remembered
-  // per browser.
+  // your level (+3), always keeping at least MIN_SHOWN of them: when fewer are in range, the steps
+  // nearest that range fill in. That and the zoom work together. These settings, and whether the
+  // notes are collapsed, are remembered per browser.
   const VIEW_KEY = 'forever-planner-view';
-  const view = { level: 1, near: false, fadeFar: false, notesCollapsed: false };
+  const view = { level: 1, near: false, fadeFar: false, zoom: false, notesCollapsed: false };
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY)) || {};
     for (const k of Object.keys(view)) if (typeof v[k] === typeof view[k]) view[k] = v[k];
@@ -421,7 +427,7 @@
   } catch { /* storage unavailable */ }
   const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch { /* storage unavailable */ } };
   const myLevel = () => view.level;
-  const AHEAD = 2, MIN_SHOWN = 5;
+  const AHEAD = 3, MIN_SHOWN = 5;
   // How many levels a step is from the window [L, L + AHEAD]; 0 when it overlaps.
   const stepDistance = (s, L) => (s.end < L ? L - s.end : s.from > L + AHEAD ? s.from - (L + AHEAD) : 0);
   function inRangeSteps(L) {
@@ -432,7 +438,13 @@
 
   function gridHTML(L) {
     let h = '<div class="grid" aria-hidden="true">';
-    for (const [a, b] of gaps()) h += `<i class="gap" style="left:${pct(a)}%;width:${pct(b) - pct(a)}%"></i>`;
+    // Shade each uncovered run from half a level before it to half a level after, so the shading
+    // meets a single point's level evenly on both sides.
+    const last = routeEnd();
+    for (const [a, b] of gaps()) {
+      const l = pct(Math.max(plan.start, a - 0.5)), r = pct(Math.min(last, b + 0.5));
+      if (r > l) h += `<i class="gap" style="left:${l}%;width:${r - l}%"></i>`;
+    }
     for (let lv = AMIN; lv <= AMAX; lv++) h += `<i class="gl${lv % 5 === 0 ? ' major' : ''}" style="left:${pct(lv)}%"></i>`;
     h += '</div><div class="grid top" aria-hidden="true">';
     for (const n of plan.notes) {
@@ -446,7 +458,7 @@
     let ticks = '';
     for (let L = AMIN; L <= AMAX; L++) {
       ticks += L % 5 === 0 || L === AMIN
-        ? `<span class="tick" style="left:${pct(L)}%">${L}</span>`
+        ? `<span class="tick${L === AMIN ? ' first' : ''}" style="left:${pct(L)}%">${L}</span>`
         : `<span class="tick minor" style="left:${pct(L)}%"></span>`;
     }
     for (const n of plan.notes) {
@@ -468,6 +480,7 @@
   }
 
   function barHTML(s) {
+    if (s.end < AMIN) return '<span class="pbar-off" title="Before the zoomed range">◂</span>';   // zoomed past it
     const g = barGeometry(s.from, s.end);
     const point = s.from === s.end;
     const tip = s.t === 'dungeon' ? ` data-tip="d:${s.k}${s.wing ? ':' + esc(s.wing) : ''}"` : ` title="${esc(stepName(s))}: ${s.from}–${s.end}"`;
@@ -491,8 +504,9 @@
       : '';
     const name = esc(stepName(s));
     return `
-      <div class="row pstep ${s.t}${isOpen ? ' open' : ''}${far ? ' far' : ''}" data-sid="${s.id}">
+      <div class="row pstep ${s.t}${isOpen ? ' open' : ''}${far ? ' far' : ''}${s.done ? ' done' : ''}" data-sid="${s.id}">
         <div class="label">
+          <label class="check pdone" title="${s.done ? 'Completed' : 'Mark complete'}"><input type="checkbox" data-step-done="${s.id}"${s.done ? ' checked' : ''}><span class="sr">${name} completed</span></label>
           <span class="pnum">${i + 1}</span>
           <button type="button" class="pname" data-pstep="${s.id}" aria-expanded="${isOpen}">${name}</button>
           ${s.t === 'dungeon' && byKey[s.k].type === 'new' ? '<span class="new-tag">New</span>' : ''}
@@ -736,7 +750,7 @@
   function renderSummary() {
     const g = gaps();
     $('#p-summary').innerHTML = g.length
-      ? `<p class="pwarn warn">⚠ Nothing planned for ${g.map(([a, b]) => b - a === 1 ? `level ${a}` : `levels ${a}–${b - 1}`).join(', ')}. Shaded on the timeline.</p>`
+      ? `<p class="pwarn warn">⚠ Nothing planned for ${g.map(([a, b]) => a === b ? `level ${a}` : `levels ${a}–${b}`).join(', ')}. Shaded on the timeline.</p>`
       : '';
   }
 
@@ -840,10 +854,12 @@
     $('#p-level-out').textContent = myLevel();
     $('#p-near').checked = view.near;
     $('#p-fade-far').checked = view.fadeFar;
+    $('#p-zoom').checked = view.zoom;
   }
 
   function render() {
     const L = myLevel();
+    setAxis(L);
     const notesFor = {};
     for (const n of plan.notes) for (const s of noteOwners(n)) (notesFor[s.id] ||= []).push(n);
     // Step numbers stay the same whether or not other steps are hidden; an open step stays shown.
@@ -859,7 +875,7 @@
     scrollTo(0, y);
     renderSummary();
     if (view.near && rows.length < plan.steps.length) {
-      $('#p-summary').insertAdjacentHTML('afterbegin', `<p class="dim small">Showing ${rows.length} of ${plan.steps.length} steps near level ${L}–${L + AHEAD}. Untick “Only show my level (+2)” to see them all.</p>`);
+      $('#p-summary').insertAdjacentHTML('afterbegin', `<p class="dim small">Showing ${rows.length} of ${plan.steps.length} steps near level ${L}–${L + AHEAD}. Untick “Only show my level (+3)” to see them all.</p>`);
     }
     renderNotes();
     renderAddSelects();
@@ -952,6 +968,12 @@
         if (lv.dataset.from) { s.from = v; s.end = Math.max(s.end, v); }
         else { s.end = v; s.from = Math.min(s.from, v); }
       });
+      return;
+    }
+    const doneBox = e.target.closest('[data-step-done]');
+    if (doneBox) {
+      const s = stepById(doneBox.dataset.stepDone);
+      if (s) change(() => { s.done = doneBox.checked; });
       return;
     }
     const take = e.target.closest('[data-take]');
@@ -1069,6 +1091,10 @@
     li.classList.add('flash');
   }
 
+  $('#p-zoom').addEventListener('change', e => {
+    view.zoom = e.target.checked;
+    saveView(); render();
+  });
   $('#p-notes-toggle').addEventListener('click', () => {
     view.notesCollapsed = !view.notesCollapsed;
     saveView(); renderNotes();

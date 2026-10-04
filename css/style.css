@@ -927,6 +927,7 @@ input.num { width: 72px; }
 #route-timeline { --label-w: 410px; --track-min: 720px; }
 #route-timeline .row.axis { min-height: 40px; }
 #route-timeline .tick:not(.minor) { top: 64%; }
+#route-timeline .tick.first { transform: translate(2px, -50%); }   /* keep the first label inside the track */
 .note-flag {
   position: absolute;
   top: 1px;
@@ -949,6 +950,14 @@ input.num { width: 72px; }
 }
 
 .row.pstep { min-height: 32px; border-top: 1px solid rgba(255, 209, 0, .05); }
+/* Completed steps: greyed and struck through */
+.pdone { flex: none; }
+.row.pstep.done .pname { color: var(--d-grey); text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, .45); }
+.row.pstep.done .label > :not(.pdone):not(.pname) { opacity: .45; }
+.row.pstep.done .pbar { filter: grayscale(1); opacity: .45; }
+.row.pstep.done .pbar-off { opacity: .45; }
+/* A step that ends before the zoomed axis starts */
+.pbar-off { position: absolute; left: 2px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--ink-dim); }
 .row.pstep .track { cursor: pointer; }
 .row.pstep.open .label { background: #2c2214; box-shadow: inset 3px 0 0 var(--gold); }
 .pnum { flex: none; width: 18px; text-align: right; font: 700 11px/1 "Cinzel", serif; color: var(--gold-dim); }
