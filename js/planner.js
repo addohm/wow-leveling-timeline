@@ -435,14 +435,14 @@
   }
 
   // ---------- Add forms ----------
-  // "Add place" lists zones plus Custom…; "Add dungeon" lists dungeons and their wings.
+  // "Add zone" lists zones plus Custom…; "Add dungeon" lists dungeons and their wings.
   const addForm = kind => document.querySelector(`form[data-add="${kind}"]`);
   const field = (form, f) => form.querySelector(`[data-f="${f}"]`);
 
   function renderAddSelects() {
     const zones = ZONES.filter(z => z.side === 'C' || z.side === plan.faction).sort((a, b) => a.min - b.min || a.name.localeCompare(b.name));
     const dungeons = [...DUNGEONS].sort((a, b) => a.min - b.min || a.max - b.max);
-    fillSelect(addForm('place'), zones.map(z => `<option value="zone:${z.key}">${esc(z.name)}</option>`).join('')
+    fillSelect(addForm('zone'), zones.map(z => `<option value="zone:${z.key}">${esc(z.name)}</option>`).join('')
       + '<option value="custom">Custom…</option>');
     fillSelect(addForm('dungeon'), dungeons.map(d => (d.wings
       ? d.wings.map(w => `<option value="dungeon:${d.key}:${esc(w.name)}">${esc(d.name)} · ${esc(w.name)}</option>`).join('')

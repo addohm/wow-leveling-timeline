@@ -35,7 +35,7 @@ and the cross-faction travel route where one exists.
 
 ## Route Planner
 
-The **Route Planner** tab lays out your leveling route on a level axis. Use **Add place** for a
+The **Route Planner** tab lays out your leveling route on a level axis. Use **Add zone** for a
 zone or a custom step and **Add dungeon** for a dungeon, each with a min and max level. Steps can overlap, like a dungeon run in
 the middle of a zone. Drag the handles on either side of a step to change its levels, or drag the
 step itself to move it. A step whose min and max are the same is a single point.
@@ -95,7 +95,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=6`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=7`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally
