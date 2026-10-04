@@ -1083,10 +1083,29 @@
     save();
     render();
   });
-  $('#p-clear').addEventListener('click', () => {
-    if (!plan.steps.length && !plan.notes.length) return;
-    if (!confirm('Clear every step and note in your route?')) return;
+  // Reset to default: what a new planner starts with. Clear plan: no steps and no notes at all.
+  $('#p-reset').addEventListener('click', async () => {
+    const ok = await confirmBox('Reset to default?',
+      '<p>Your route and notes are replaced with an empty route and the default notes. Faction, class and level go back to none, any and 1.</p>',
+      'Reset');
+    if (!ok) return;
     open.clear();
+    editingNote = null;
+    plan = clean({ notes: DEFAULT_NOTES.map(noteFields) });
+    view.level = 1;
+    saveView();
+    save();
+    render();
+    toast('Planner reset to default');
+  });
+  $('#p-clear').addEventListener('click', async () => {
+    if (!plan.steps.length && !plan.notes.length) return;
+    const ok = await confirmBox('Clear plan?',
+      `<p>This removes your ${plan.steps.length} step${plan.steps.length === 1 ? '' : 's'} and ${plan.notes.length} note${plan.notes.length === 1 ? '' : 's'}. Use <b>Reset to default</b> to get the default notes back.</p>`,
+      'Clear plan');
+    if (!ok) return;
+    open.clear();
+    editingNote = null;
     change(() => { plan.steps = []; plan.notes = []; });
   });
   $('#p-share').addEventListener('click', async () => {

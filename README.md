@@ -58,7 +58,8 @@ step itself to move it. A step whose min and max are the same is a single point.
   timeline, on a step, or in a step's details jumps to that note.
 - **New planners** start empty (apart from the default notes), with no faction, any class, and
   level 1. Click the selected faction again to clear it; with no faction, zone lists and quest
-  pickups include both factions.
+  pickups include both factions. **Reset to default** returns to that; **Clear plan** removes
+  every step and note.
 - **Level notes**: reminders pinned to a level, like "at 14, the sleeping bag chain begins".
   They stay at that level when steps move. Each note can also have a **quest**, **items**
   (comma-separated) and a YouTube **video**; each takes an ID or a full link, and a video can
@@ -102,7 +103,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=24`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=25`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally
