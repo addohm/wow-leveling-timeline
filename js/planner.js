@@ -434,25 +434,32 @@
       : '';
   }
 
-  function renderAddSelect() {
-    const sel = $('#p-add');
-    const prev = sel.value;
+  // ---------- Add forms ----------
+  // "Add place" lists zones plus Custom…; "Add dungeon" lists dungeons and their wings.
+  const addForm = kind => document.querySelector(`form[data-add="${kind}"]`);
+  const field = (form, f) => form.querySelector(`[data-f="${f}"]`);
+
+  function renderAddSelects() {
     const zones = ZONES.filter(z => z.side === 'C' || z.side === plan.faction).sort((a, b) => a.min - b.min || a.name.localeCompare(b.name));
     const dungeons = [...DUNGEONS].sort((a, b) => a.min - b.min || a.max - b.max);
-    sel.innerHTML = `
-      <optgroup label="Zones">${zones.map(z => `<option value="zone:${z.key}">${esc(z.name)}</option>`).join('')}</optgroup>
-      <optgroup label="Dungeons">${dungeons.map(d => (d.wings
-        ? d.wings.map(w => `<option value="dungeon:${d.key}:${esc(w.name)}">${esc(d.name)} · ${esc(w.name)}</option>`).join('')
-        : `<option value="dungeon:${d.key}">${esc(d.name)}</option>`)).join('')}</optgroup>
-      <option value="custom">Custom…</option>`;
+    fillSelect(addForm('place'), zones.map(z => `<option value="zone:${z.key}">${esc(z.name)}</option>`).join('')
+      + '<option value="custom">Custom…</option>');
+    fillSelect(addForm('dungeon'), dungeons.map(d => (d.wings
+      ? d.wings.map(w => `<option value="dungeon:${d.key}:${esc(w.name)}">${esc(d.name)} · ${esc(w.name)}</option>`).join('')
+      : `<option value="dungeon:${d.key}">${esc(d.name)}</option>`)).join(''));
+  }
+  function fillSelect(form, html) {
+    const sel = field(form, 'pick');
+    const prev = sel.value;
+    sel.innerHTML = html;
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
-    else prefillAdd();
+    else prefillAdd(form);
   }
 
-  // Min and max start out as the chosen location's level range (a dungeon starts as a point at its
-  // suggested level); custom steps start at the end of the route.
-  function prefillAdd() {
-    const [t, k, wing] = $('#p-add').value.split(':');
+  // Min and max start out as the zone's level range, or a single point at a dungeon's suggested
+  // level; custom steps start at the end of the route.
+  function prefillAdd(form) {
+    const [t, k, wing] = field(form, 'pick').value.split(':');
     let min, max;
     if (t === 'zone') ({ min, max } = zoneByKey[k]);
     else if (t === 'dungeon') {
@@ -460,10 +467,11 @@
       const w = wing && d.wings?.find(x => x.name === wing);
       min = max = w ? Math.min(w.max, w.min + 2) : suggestedLevel(d);
     } else { min = routeEnd(); max = Math.min(60, min + 1); }
-    $('#p-add-min').value = min;
-    $('#p-add-max').value = max;
-    $('#p-add-name').hidden = t !== 'custom';
-    $('#p-add-err').textContent = '';
+    field(form, 'min').value = min;
+    field(form, 'max').value = max;
+    const name = field(form, 'name');
+    if (name) name.hidden = t !== 'custom';
+    field(form, 'err').textContent = '';
   }
 
   function syncSettings() {
@@ -483,7 +491,7 @@
     scrollTo(0, y);
     renderSummary();
     renderNotes();
-    renderAddSelect();
+    renderAddSelects();
     syncSettings();
   }
 
@@ -502,26 +510,28 @@
     return { id: uid(), t, k, wing: wing || undefined, from, end, pick: {} };
   }
 
-  $('#p-add').addEventListener('change', prefillAdd);
-  ['#p-add-name', '#p-add-min', '#p-add-max'].forEach(id => $(id).addEventListener('input', () => { $('#p-add-err').textContent = ''; }));
-  $('#p-add-form').addEventListener('submit', e => {
-    e.preventDefault();
-    const err = $('#p-add-err');
-    err.textContent = '';
-    const [t, k, wing] = $('#p-add').value.split(':');
-    const minRaw = $('#p-add-min').value.trim(), maxRaw = $('#p-add-max').value.trim();
-    const min = Math.round(Number(minRaw)), max = Math.round(Number(maxRaw));
-    const name = $('#p-add-name').value.trim();
-    if (t === 'custom' && !name) { err.textContent = 'Enter a name for the custom step.'; return; }
-    if (!minRaw || !(min >= 1 && min <= 60)) { err.textContent = 'Enter a min level from 1 to 60.'; return; }
-    if (!maxRaw || !(max >= 1 && max <= 60)) { err.textContent = 'Enter a max level from 1 to 60.'; return; }
-    if (max < min) { err.textContent = 'The max level can’t be below the min level.'; return; }
-    const step = t === 'custom'
-      ? { id: uid(), t, name: name.slice(0, 60), from: min, end: max }
-      : newStep(t, k, wing, min, max);
-    change(() => plan.steps.push(step));
-    $('#p-add-name').value = '';
-    document.querySelector(`.pstep[data-sid="${step.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  document.querySelectorAll('form[data-add]').forEach(form => {
+    field(form, 'pick').addEventListener('change', () => prefillAdd(form));
+    form.addEventListener('input', () => { field(form, 'err').textContent = ''; });
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const err = field(form, 'err');
+      err.textContent = '';
+      const [t, k, wing] = field(form, 'pick').value.split(':');
+      const minRaw = field(form, 'min').value.trim(), maxRaw = field(form, 'max').value.trim();
+      const min = Math.round(Number(minRaw)), max = Math.round(Number(maxRaw));
+      const name = field(form, 'name')?.value.trim() || '';
+      if (t === 'custom' && !name) { err.textContent = 'Enter a name for the custom step.'; return; }
+      if (!minRaw || !(min >= 1 && min <= 60)) { err.textContent = 'Enter a min level from 1 to 60.'; return; }
+      if (!maxRaw || !(max >= 1 && max <= 60)) { err.textContent = 'Enter a max level from 1 to 60.'; return; }
+      if (max < min) { err.textContent = 'The max level can’t be below the min level.'; return; }
+      const step = t === 'custom'
+        ? { id: uid(), t, name: name.slice(0, 60), from: min, end: max }
+        : newStep(t, k, wing, min, max);
+      change(() => plan.steps.push(step));
+      if (field(form, 'name')) field(form, 'name').value = '';
+      document.querySelector(`.pstep[data-sid="${step.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
   });
 
   document.addEventListener('click', e => {

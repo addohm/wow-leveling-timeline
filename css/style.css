@@ -1003,12 +1003,15 @@ input.num.plv { width: 50px; padding: 2px 4px; font-size: 14px; }
 ul.ref-quests li.skipped a { opacity: .45; text-decoration: line-through; }
 .pdrawer ul.ref-quests .small { white-space: nowrap; }
 
-.add-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
-.add-row select { flex: 0 1 360px; min-width: 220px; }
+.add-forms { display: grid; gap: 10px; margin-top: 14px; }
+.add-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.add-label { flex: none; width: 118px; font: 700 13px/1 "Cinzel", serif; letter-spacing: .06em; color: var(--gold); }
+.add-row select { flex: 0 1 320px; min-width: 200px; }
 .add-row input[type=text] { flex: 0 1 220px; }
+.add-row .form-err { flex-basis: 100%; margin: 0 0 0 128px; }
+.add-row .form-err:empty { display: none; }
 .lv-field { display: flex; align-items: center; gap: 6px; font: 700 12px/1 "Cinzel", serif; letter-spacing: .08em; color: var(--gold); }
 .lv-field input.num { width: 64px; }
-#p-add-err { margin: 6px 0 0; }
 
 .notes-panel { margin-top: 18px; padding-top: 12px; border-top: 1px solid #3b2f1e; }
 .notes-panel h3 { margin: 0 0 8px; font: 700 18px/1.1 "Cinzel", serif; color: var(--gold); }
@@ -1067,6 +1070,8 @@ footer.frame { margin-top: 26px; margin-bottom: 36px; }
   input.num.plv { width: 42px; }
   .note-form { grid-template-columns: 70px minmax(0, 1fr); }
   .add-row select { flex: 1 1 100%; min-width: 0; }
+  .add-label { width: auto; flex-basis: 100%; }
+  .add-row .form-err { margin-left: 0; }
   .tabs button { padding: 9px 14px; font-size: 13px; }
 }
 
