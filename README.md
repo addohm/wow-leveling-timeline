@@ -54,8 +54,8 @@ step itself to move it. A step whose min and max are the same is a single point.
   there, zones you'll outlevel, and levels nothing in the route covers (shaded).
 - **Your level**: the planner's own level slider (it starts at 1), marked on the planner's axis.
   *Zoom to my level* shows the timeline from 3 levels below your level up to 60. *Only show my
-  level (+3)* hides route steps outside your level to three levels above, and *Highlight in-range*
-  fades them instead. Either way at least 5 steps stay shown, topped up with the nearest ones; the
+  level (+/- 3)* hides route steps more than three levels below or above yours, and *Highlight
+  in-range* fades them instead. Either way at least 7 steps stay shown, topped up with the nearest ones; the
   zoom works with either. The level notes list can be collapsed; clicking a note's ⚑ flag on the
   timeline, on a step, or in a step's details jumps to that note.
 - **New planners** start empty (apart from the default notes), with no faction, any class, and
@@ -105,7 +105,7 @@ match a heading in `DUNGEON_FOR_HEADING` in the refresh script.
 
 ## Releasing changes
 
-`index.html` loads the CSS and scripts with a version query (`?v=30`). Bump it whenever you change
+`index.html` loads the CSS and scripts with a version query (`?v=31`). Bump it whenever you change
 any of them, so browsers don't mix a cached old file with new ones.
 
 ## Run locally

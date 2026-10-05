@@ -415,7 +415,7 @@
 
   // ---------- Level filter ----------
   // The planner has its own "your level" (starting at 1). It can hide or fade route steps outside
-  // your level (+3), always keeping at least MIN_SHOWN of them: when fewer are in range, the steps
+  // 3 levels either side of your level, always keeping at least MIN_SHOWN of them: when fewer are in range, the steps
   // nearest that range fill in. That and the zoom work together. These settings, and whether the
   // notes are collapsed, are remembered per browser.
   const VIEW_KEY = 'forever-planner-view';
@@ -427,9 +427,9 @@
   } catch { /* storage unavailable */ }
   const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch { /* storage unavailable */ } };
   const myLevel = () => view.level;
-  const AHEAD = 3, MIN_SHOWN = 5;
-  // How many levels a step is from the window [L, L + AHEAD]; 0 when it overlaps.
-  const stepDistance = (s, L) => (s.end < L ? L - s.end : s.from > L + AHEAD ? s.from - (L + AHEAD) : 0);
+  const SPREAD = 3, MIN_SHOWN = 7;
+  // How many levels a step is from the window [L - SPREAD, L + SPREAD]; 0 when it overlaps.
+  const stepDistance = (s, L) => (s.end < L - SPREAD ? L - SPREAD - s.end : s.from > L + SPREAD ? s.from - (L + SPREAD) : 0);
   function inRangeSteps(L) {
     const ranked = plan.steps.map((s, i) => [s, stepDistance(s, L), i]).sort((a, b) => a[1] - b[1] || a[2] - b[2]);
     const near = ranked.filter(r => r[1] === 0);
@@ -875,7 +875,7 @@
     scrollTo(0, y);
     renderSummary();
     if (view.near && rows.length < plan.steps.length) {
-      $('#p-summary').insertAdjacentHTML('afterbegin', `<p class="dim small">Showing ${rows.length} of ${plan.steps.length} steps near level ${L}–${L + AHEAD}. Untick “Only show my level (+3)” to see them all.</p>`);
+      $('#p-summary').insertAdjacentHTML('afterbegin', `<p class="dim small">Showing ${rows.length} of ${plan.steps.length} steps near level ${Math.max(1, L - SPREAD)}–${Math.min(60, L + SPREAD)}. Untick “Only show my level (+/- 3)” to see them all.</p>`);
     }
     renderNotes();
     renderAddSelects();
