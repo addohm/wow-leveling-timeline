@@ -690,8 +690,16 @@
     renderReference(ref.dataset.key);
   }
 
-  function mapHTML(jd) {
-    const m = jd?.map;
+  // A dungeon's map: DungeonJournal's own when it has an image, otherwise one from the
+  // ForeverInstanceMaps addon (data/instance-maps.js), otherwise just DungeonJournal's boss list.
+  // Floors may have names; boss pins are fractions of the floor image.
+  const IM = window.FOREVER_INSTANCE_MAPS || { dungeons: {} };
+  const dungeonMap = (key, jd) => (jd?.map?.floors?.length ? jd.map : IM.dungeons[key] || jd?.map || null);
+  const mapSource = (key, jd) => (jd?.map?.floors?.length ? J.source || 'DungeonJournal' : IM.dungeons[key] ? IM.source : null);
+  // Boss names in the map data can carry notes, like "Captain Greenskin (roams top of boat)".
+  const bossKey = name => String(name).toLowerCase().replace(/\s*\(.*?\)\s*/g, ' ').trim();
+
+  function mapHTML(m, name, source) {
     if (!m) return '';
     if (!m.floors.length) {
       const byFloor = {};
@@ -708,14 +716,15 @@
       ? `<span class="pin entrance" style="left:${m.entrance.x * 100}%;top:${m.entrance.y * 100}%" title="Entrance"><i style="transform:rotate(${-(m.entrance.angle || 0)}deg)">➜</i><em>Entrance</em></span>` : '';
     const trans = (m.transitions || []).filter(t => t.floor === refFloor).map(t =>
       `<button type="button" class="pin stairs" style="left:${t.x * 100}%;top:${t.y * 100}%" data-floor="${t.to}" title="To level ${t.to}"><i>⇅</i><em>Level ${t.to}</em></button>`).join('');
+    const floorName = (f, i) => f.name || `Level ${i + 1}`;
     const tabs = m.floors.length > 1
-      ? `<div class="floor-tabs">${m.floors.map((f, i) => f ? `<button type="button" class="wow-btn small${i + 1 === refFloor ? ' active' : ''}" data-floor="${i + 1}">Level ${i + 1}</button>` : '').join('')}</div>` : '';
+      ? `<div class="floor-tabs">${m.floors.map((f, i) => f ? `<button type="button" class="wow-btn small${i + 1 === refFloor ? ' active' : ''}" data-floor="${i + 1}">${esc(floorName(f, i))}</button>` : '').join('')}</div>` : '';
     return `${tabs}
       <div class="map-wrap" style="aspect-ratio:${fl.width}/${fl.height}">
-        <img src="${fl.image}" alt="${esc(jd.name)} map, level ${refFloor}" loading="lazy">
+        <img src="${fl.image}" alt="${esc(name)} map, ${esc(floorName(fl, m.floors.indexOf(fl)))}" loading="lazy">
         ${ent}${trans}${pins}
       </div>
-      <p class="dim small"><a href="${fl.image}" target="_blank" rel="noopener">Open full-size map ↗</a></p>`;
+      <p class="dim small"><a href="${fl.image}" target="_blank" rel="noopener">Open full-size map ↗</a>${source ? ` · Map from ${esc(source)}` : ''}</p>`;
   }
 
   function renderReference(key) {
@@ -727,7 +736,8 @@
     const entrance = jd?.entrance ? { place: jd.entrance.label || ZONES[jd.entrance.mapID], pt: pointFrom(jd.entrance) } : null;
     const routeFor = jd?.route && (state.faction === 'all' || state.faction === (jd.route.faction === 'Horde' ? 'H' : 'A'));
     const bosses = jd?.bosses || [];
-    const bossNo = new Map((jd?.map?.bosses || []).map((b, i) => [b.name, i + 1]));
+    const map = dungeonMap(key, jd);
+    const bossNo = new Map((map?.floors?.length ? map.bosses : []).map((b, i) => [bossKey(b.name), i + 1]));
 
     ref.innerHTML = `
       <div class="ref-frame">
@@ -750,13 +760,13 @@
                 <span class="d-orange">${g.medium}<small>Medium</small></span>
                 <span class="d-yellow">${g.at}<small>At level</small></span>
                 ${g.easy ? `<span class="d-green">${g.easy}<small>Easy</small></span>` : ''}</div>` : ''}
-              ${mapHTML(jd)}
+              ${mapHTML(map, d.name, mapSource(key, jd))}
             </section>
             <section>
               ${bosses.length ? `<h3>Bosses</h3><ol class="bosses">${bosses.map(b => `
                 <li>
                   <details>
-                    <summary>${bossNo.has(b.name) ? `<span class="pin-no">${bossNo.get(b.name)}</span>` : '<span class="pin-no blank"></span>'}<b>${esc(b.name)}</b>${b.level ? ` <span class="dim">Lv ${esc(b.level)}</span>` : ''}${b.loot?.length ? ` <span class="dim small">· ${b.loot.length} drops</span>` : ''}</summary>
+                    <summary>${bossNo.has(bossKey(b.name)) ? `<span class="pin-no">${bossNo.get(bossKey(b.name))}</span>` : '<span class="pin-no blank"></span>'}<b>${esc(b.name)}</b>${b.level ? ` <span class="dim">Lv ${esc(b.level)}</span>` : ''}${b.loot?.length ? ` <span class="dim small">· ${b.loot.length} drops</span>` : ''}</summary>
                     ${b.loot?.length ? `<ul class="loot">${b.loot.map(it => `<li><a class="${QUALITY[it.quality] || ''}" href="${WOWHEAD}item=${it.id}" target="_blank" rel="noopener">${esc(it.name)}</a> <span class="dim small">${esc(it.slot || '')}</span></li>`).join('')}</ul>` : ''}
                   </details>
                 </li>`).join('')}</ol>` : ''}
